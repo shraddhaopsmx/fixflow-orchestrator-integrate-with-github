@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { PolicyRule } from '@/lib/policy-engine';
 import {
@@ -56,7 +55,7 @@ const PolicyList: React.FC<PolicyListProps> = ({ policies, onEdit, onDelete }) =
               {policies.map((policy) => (
                 <TableRow key={policy.id}>
                   <TableCell className="font-medium">
-                    <div className="font-bold">{policy.name}</div>
+                    <div className="font-bold">{policy.name || 'Untitled Policy'}</div>
                     <div className="text-xs text-muted-foreground">{policy.description}</div>
                   </TableCell>
                   <TableCell className="text-sm">{renderConditions(policy.conditions)}</TableCell>
