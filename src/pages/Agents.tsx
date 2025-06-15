@@ -3,12 +3,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { agents as existingAgents } from "@/lib/mock-data";
-import { Settings, Play, Pause, Activity, Cloud, FileCode } from "lucide-react";
+import { Settings, Play, Pause, Activity, Cloud, FileCode, ShieldCheck } from "lucide-react";
 import IaCRemediationAgent from "@/components/agents/IaCRemediationAgent";
 import PipelineRemediationAgent from "@/components/agents/PipelineRemediationAgent";
 import RuntimeRemediationAgent from "@/components/agents/RuntimeRemediationAgent";
 import CloudRemediationAgent from "@/components/agents/CloudRemediationAgent";
 import CodeRemediationAgent from "@/components/agents/CodeRemediationAgent";
+import OrchestrationAgent from "@/components/agents/OrchestrationAgent";
 import { Agent } from "@/types";
 
 const Agents = () => {
@@ -29,6 +30,10 @@ const Agents = () => {
     name: 'Code',
     icon: FileCode,
     description: 'Analyzes SAST/SCA findings and suggests code patches.'
+  }, {
+    name: 'Orchestrator',
+    icon: ShieldCheck,
+    description: 'Coordinates all agents to run full remediation flows.'
   }];
 
   return (
@@ -49,12 +54,12 @@ const Agents = () => {
       <Tabs defaultValue="overview" className="w-full">
         <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="orchestrator">Orchestrator</TabsTrigger>
           <TabsTrigger value="code-agent">Code Agent</TabsTrigger>
           <TabsTrigger value="iac-agent">IaC Agent</TabsTrigger>
           <TabsTrigger value="pipeline-agent">Pipeline Agent</TabsTrigger>
           <TabsTrigger value="runtime-agent">Runtime Agent</TabsTrigger>
           <TabsTrigger value="cloud-agent">Cloud Agent</TabsTrigger>
-          <TabsTrigger value="performance">Performance</TabsTrigger>
         </TabsList>
         
         <TabsContent value="overview" className="space-y-4">
@@ -105,6 +110,10 @@ const Agents = () => {
           </div>
         </TabsContent>
         
+        <TabsContent value="orchestrator">
+          <OrchestrationAgent />
+        </TabsContent>
+
         <TabsContent value="code-agent">
           <CodeRemediationAgent />
         </TabsContent>
@@ -125,36 +134,6 @@ const Agents = () => {
           <CloudRemediationAgent />
         </TabsContent>
         
-        <TabsContent value="performance" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Agent Performance Overview</CardTitle>
-              <CardDescription>
-                Monitor the performance and health of your remediation agents
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 md:grid-cols-4">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-green-600">5</div>
-                  <div className="text-sm text-muted-foreground">Active Agents</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold">342</div>
-                  <div className="text-sm text-muted-foreground">Total Fixes</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-green-600">92%</div>
-                  <div className="text-sm text-muted-foreground">Success Rate</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold">1.2h</div>
-                  <div className="text-sm text-muted-foreground">Avg MTTR</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
     </>
   );
