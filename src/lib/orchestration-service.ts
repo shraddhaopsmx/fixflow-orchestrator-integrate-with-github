@@ -1,166 +1,102 @@
 
-import { orchestrationTestInputs } from "./orchestration-test-data";
-import { codeRemediationService } from "./code-remediation-service";
-import { iacRemediationService } from "./iac-remediation-service";
-import { pipelineRemediationService } from "./pipeline-remediation-service";
-import { cloudRemediationService } from "./cloud-remediation-service";
-import {
-  OrchestrationLogEntry,
-  OrchestrationAgentResult,
-  OrchestrationFinalReport,
-  OrchestrationInputEvent,
-} from "@/types/orchestration";
+import { fetchPrioritizedRisks, RiskIssue } from "./risk-api-client";
+import { fetchContextGraph } from "./context-graph-client";
+import { evaluatePolicy } from "./policy-engine";
+import { logEvent } from "./auditor";
+import { enqueueJob, updateJobStatus, getJob, allJobs, RemediationJob, RemediationJobStatus } from "./queue";
 
-function nowIso() {
-  return new Date().toISOString();
+// Domain classifier
+function classifyDomain(source: string): "code" | "iac" | "pipeline" | "cloud" {
+  if (source === "SAST") return "code";
+  if (source === "IaC") return "iac";
+  if (source === "Pipeline") return "pipeline";
+  if (source === "CSPM") return "cloud";
+  return "code";
 }
 
-export async function simulateOrchestrationLifecycle(): Promise<OrchestrationFinalReport> {
-  const logs: OrchestrationLogEntry[] = [];
-  const agentResults: OrchestrationAgentResult[] = [];
-  let received = 0, auto = 0, withApproval = 0, mttr = 0, totalReduction = 0;
+// Simulate remediation agent (normally would call internal API or send to queue)
+async function routeToAgent(domain: string, job: RemediationJob) {
+  // Simulate async agent processing
+  await new Promise(r => setTimeout(r, 500));
+  // Mark job as proposed (remediation ready)
+  updateJobStatus(job.jobId, "proposed");
+  logEvent({ jobId: job.jobId, action: "agent_propose_fix", details: { domain }});
+}
 
-  // Step 1: Receive and classify events
-  for (const event of orchestrationTestInputs as OrchestrationInputEvent[]) {
-    logs.push({
-      timestamp: nowIso(),
-      step: "Input",
-      details: `Received event from ${event.source}`,
-      samplePayload: event,
+export async function orchestrateRemediation() {
+  // 1. Fetch from Risk API
+  const risks = await fetchPrioritizedRisks();
+  for (const issue of risks) {
+    // 2. Fetch context
+    const context = await fetchContextGraph(issue.id);
+
+    // 3. Classify domain
+    const domain = classifyDomain(issue.source);
+
+    // 4. Policy decision
+    const policy = evaluatePolicy(issue);
+
+    // 5. Create Remediation Job
+    const jobId = `job-${Date.now()}-${Math.floor(Math.random()*10000)}`;
+    const job: RemediationJob = {
+      jobId,
+      issueId: issue.id,
+      domain,
+      status: "queued",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      requiresApproval: policy.requiresApproval,
+      severity: issue.severity,
+      summary: issue.summary,
+      context,
+    };
+
+    enqueueJob(job);
+    logEvent({ jobId, action: "job_queued", details: { domain, policy } });
+
+    // 6. Route to agent (async queue sim)
+    routeToAgent(domain, job).then(() => {
+      // If auto, auto approve & execute
+      if (policy.autoRemediate) {
+        updateJobStatus(jobId, "approved");
+        logEvent({ jobId, action: "job_auto_approved", details: {} });
+        updateJobStatus(jobId, "executed");
+        logEvent({ jobId, action: "job_executed", details: {} });
+      }
     });
-    let agent: "Code" | "IaC" | "Pipeline" | "Cloud";
-    let apiSampleRequest, apiSampleResponse, result, approvalRequired, approved = true, applied = false, humanApprovalSimulated = false;
-    let riskReductionScore = 0;
-    let start = Date.now();
-
-    // Step 2: Classify and route
-    switch (event.source) {
-      case "SAST":
-        agent = "Code";
-        approvalRequired = false;
-        logs.push({
-          timestamp: nowIso(),
-          step: "Route",
-          details: "Classified as SAST. Routed to Code Remediation Agent.",
-        });
-        apiSampleRequest = event.finding;
-        result = await codeRemediationService.generateFix(event.finding);
-        riskReductionScore = result.success ? 30 : 0;
-        break;
-      case "IaC":
-        agent = "IaC";
-        approvalRequired = true;
-        logs.push({
-          timestamp: nowIso(),
-          step: "Route",
-          details: "Classified as IaC issue. Routed to IaC Agent.",
-        });
-        apiSampleRequest = event.finding;
-        result = await iacRemediationService.remediateConfiguration(event.finding);
-        riskReductionScore = result.success ? 25 : 0;
-        break;
-      case "Pipeline":
-        agent = "Pipeline";
-        approvalRequired = false;
-        logs.push({
-          timestamp: nowIso(),
-          step: "Route",
-          details: "Classified as Pipeline issue. Routed to Pipeline Agent.",
-        });
-        apiSampleRequest = event.finding;
-        result = await pipelineRemediationService.remediatePipeline(event.finding);
-        riskReductionScore = result.success ? 20 : 0;
-        break;
-      case "CSPM":
-        agent = "Cloud";
-        approvalRequired = true;
-        logs.push({
-          timestamp: nowIso(),
-          step: "Route",
-          details: "Classified as CSPM alert. Routed to Cloud Remediation Agent.",
-        });
-        apiSampleRequest = event.finding;
-        result = await cloudRemediationService.remediate(event.finding);
-        riskReductionScore = result.success ? 25 : 0;
-        break;
-    }
-    const approveDecision = approvalRequired ? "Human-in-the-Loop (simulated approval)" : "Auto-remediation";
-    if (approvalRequired) {
-      humanApprovalSimulated = true;
-      logs.push({
-        timestamp: nowIso(),
-        step: "Approval",
-        details: "Simulated human reviewer approved remediation.",
-        decisionPoint: "Approval required"
-      });
-      approved = true;
-      withApproval++;
-    } else {
-      logs.push({
-        timestamp: nowIso(),
-        step: "Approval",
-        details: "Auto-remediation: Proceeding without approval.",
-        decisionPoint: "Auto-remediation"
-      });
-      auto++;
-    }
-
-    // Step 3: Agent executes and returns a result
-    const completedTime = nowIso();
-    apiSampleResponse = result;
-    applied = approved && !!result.success;
-    logs.push({
-      timestamp: nowIso(),
-      step: "Execution",
-      details: `Agent ${agent} executed fix. Success: ${!!result.success}`,
-      sampleResponse: result
-    });
-
-    // Step 4: Fix application and audit log
-    if (applied) {
-      logs.push({
-        timestamp: nowIso(),
-        step: "Fix Application",
-        details: `Fix applied for ${agent} agent.`,
-      });
-    } else {
-      logs.push({
-        timestamp: nowIso(),
-        step: "Fix Skipped",
-        details: `Fix not applied for ${agent} agent due to previous step failure.`,
-      });
-    }
-    // Record agent result
-    agentResults.push({
-      agent,
-      proposedFix: result?.suggestedPatch || result?.updatedConfig || result?.remediation?.code || "",
-      confidence: result?.success ? 0.95 : 0.5,
-      explanation: result.explanation,
-      rollback: result?.rollback?.code || undefined,
-      approvalRequired,
-      approved,
-      applied,
-      apiSampleRequest,
-      apiSampleResponse,
-      timeReceived: new Date(start).toISOString(),
-      timeCompleted: completedTime,
-      riskReductionScore,
-      humanApprovalSimulated
-    });
-    received++;
-    mttr += (Date.now() - start) / 1000;
-    totalReduction += riskReductionScore;
   }
+}
 
-  // Step 5: Final summary
-  const report: OrchestrationFinalReport = {
-    issuesReceived: received,
-    issuesFixedAuto: auto,
-    issuesFixedWithApproval: withApproval,
-    mttrSeconds: received ? Math.round(mttr / received) : 0,
-    riskReduction: totalReduction,
-    agentResults,
-    logs,
-  };
-  return report;
+// RESTful endpoint handlers (to be routed in your server framework)
+export async function getJobsHandler(req: any, res: any) {
+  res.json(allJobs());
+}
+
+export async function getJobHandler(req: any, res: any) {
+  const job = getJob(req.params.jobId);
+  if (!job) return res.status(404).json({ error: "Job not found" });
+  res.json(job);
+}
+
+export async function syncHandler(req: any, res: any) {
+  await orchestrateRemediation();
+  res.json({ message: "Sync started" });
+}
+
+export async function approveJobHandler(req: any, res: any) {
+  const job = getJob(req.params.jobId);
+  if (!job) return res.status(404).json({ error: "Job not found" });
+  if (!job.requiresApproval) return res.status(400).json({ error: "Approval not required" });
+  updateJobStatus(job.jobId, "approved");
+  logEvent({ jobId: job.jobId, action: "job_approved", details: { by: "human" }});
+  // Simulate execution
+  updateJobStatus(job.jobId, "executed");
+  logEvent({ jobId: job.jobId, action: "job_executed", details: {} });
+  res.json({ success: true });
+}
+
+export async function auditLogHandler(req: any, res: any) {
+  // Optionally filter by job ID
+  const logs = require('./auditor').getAuditLog(req.params.jobId);
+  res.json(logs);
 }
