@@ -9,7 +9,6 @@ import Agents from "./pages/Agents";
 import NotFound from "./pages/NotFound";
 import Sidebar from "./components/layout/Sidebar";
 import Header from "./components/layout/Header";
-import PoliciesPage from "./pages/Policies";
 
 const queryClient = new QueryClient();
 
@@ -27,7 +26,6 @@ const App = () => (
                     <Routes>
                         <Route path="/" element={<Index />} />
                         <Route path="/agents" element={<Agents />} />
-                        <Route path="/policies" element={<PoliciesPage />} />
                         <Route path="*" element={<NotFound />} />
                     </Routes>
                 </main>

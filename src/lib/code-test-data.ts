@@ -1,4 +1,3 @@
-
 import { CodeFinding } from '@/types/code';
 
 export const codeTestCases: CodeFinding[] = [
@@ -27,5 +26,18 @@ export const codeTestCases: CodeFinding[] = [
     snippet: "user_id = request.args.get('id')\ncursor.execute(f\"SELECT * FROM users WHERE id = {user_id}\")",
     startLine: 101,
     endLine: 102,
+  },
+  {
+    findingId: 'CODE-PY-002',
+    filePath: 'api/requirements.txt',
+    language: 'Python',
+    vulnerability: {
+      id: 'SNYK-PY-REQUESTS-595221',
+      name: 'Remote Code Execution in "requests" library',
+      severity: 'Critical',
+    },
+    snippet: 'requests==2.22.0',
+    startLine: 15,
+    endLine: 15,
   }
 ];
