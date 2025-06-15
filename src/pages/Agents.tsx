@@ -7,6 +7,7 @@ import { agents } from "@/lib/mock-data";
 import { Settings, Play, Pause, Activity } from "lucide-react";
 import IaCRemediationAgent from "@/components/agents/IaCRemediationAgent";
 import PipelineRemediationAgent from "@/components/agents/PipelineRemediationAgent";
+import RuntimeRemediationAgent from "@/components/agents/RuntimeRemediationAgent";
 
 const Agents = () => {
   const getStatusColor = (status: string) => {
@@ -34,10 +35,11 @@ const Agents = () => {
       </div>
 
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="iac-agent">IaC Agent</TabsTrigger>
           <TabsTrigger value="pipeline-agent">Pipeline Agent</TabsTrigger>
+          <TabsTrigger value="runtime-agent">Runtime Agent</TabsTrigger>
           <TabsTrigger value="performance">Performance</TabsTrigger>
         </TabsList>
         
@@ -95,6 +97,10 @@ const Agents = () => {
         
         <TabsContent value="pipeline-agent">
           <PipelineRemediationAgent />
+        </TabsContent>
+        
+        <TabsContent value="runtime-agent">
+          <RuntimeRemediationAgent />
         </TabsContent>
         
         <TabsContent value="performance" className="space-y-4">
