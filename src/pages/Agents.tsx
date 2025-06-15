@@ -1,14 +1,14 @@
-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { agents as existingAgents } from "@/lib/mock-data";
-import { Settings, Play, Pause, Activity, Cloud } from "lucide-react";
+import { Settings, Play, Pause, Activity, Cloud, FileCode } from "lucide-react";
 import IaCRemediationAgent from "@/components/agents/IaCRemediationAgent";
 import PipelineRemediationAgent from "@/components/agents/PipelineRemediationAgent";
 import RuntimeRemediationAgent from "@/components/agents/RuntimeRemediationAgent";
 import CloudRemediationAgent from "@/components/agents/CloudRemediationAgent";
+import CodeRemediationAgent from "@/components/agents/CodeRemediationAgent";
 import { Agent } from "@/types";
 
 const Agents = () => {
@@ -25,6 +25,10 @@ const Agents = () => {
     name: 'Cloud',
     icon: Cloud,
     description: 'Remediates cloud security misconfigurations in AWS.'
+  }, {
+    name: 'Code',
+    icon: FileCode,
+    description: 'Analyzes SAST/SCA findings and suggests code patches.'
   }];
 
   return (
@@ -43,8 +47,9 @@ const Agents = () => {
       </div>
 
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="code-agent">Code Agent</TabsTrigger>
           <TabsTrigger value="iac-agent">IaC Agent</TabsTrigger>
           <TabsTrigger value="pipeline-agent">Pipeline Agent</TabsTrigger>
           <TabsTrigger value="runtime-agent">Runtime Agent</TabsTrigger>
@@ -100,6 +105,10 @@ const Agents = () => {
           </div>
         </TabsContent>
         
+        <TabsContent value="code-agent">
+          <CodeRemediationAgent />
+        </TabsContent>
+
         <TabsContent value="iac-agent">
           <IaCRemediationAgent />
         </TabsContent>
