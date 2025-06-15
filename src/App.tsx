@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
+import Agents from "./pages/Agents";
 import NotFound from "./pages/NotFound";
 import Sidebar from "./components/layout/Sidebar";
 import Header from "./components/layout/Header";
@@ -24,6 +25,7 @@ const App = () => (
                 <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6">
                     <Routes>
                         <Route path="/" element={<Index />} />
+                        <Route path="/agents" element={<Agents />} />
                         <Route path="*" element={<NotFound />} />
                     </Routes>
                 </main>
