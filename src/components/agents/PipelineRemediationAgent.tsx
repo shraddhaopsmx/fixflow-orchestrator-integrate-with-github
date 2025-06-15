@@ -1,18 +1,18 @@
+
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Settings, PlayCircle, FileText, Bot, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle, Settings, PlayCircle, FileText } from "lucide-react";
+import { pipelineRemediationService } from "@/lib/pipeline-remediation-service";
 import { allPipelineTestCases } from "@/lib/pipeline-test-data";
-import { PipelineInput } from "@/types/pipeline";
+import { PipelineInput, PipelineRemediationResult } from "@/types/pipeline";
 import { useToast } from "@/hooks/use-toast";
-import { runAutoFixWorkflow } from '@/lib/autofix-workflow';
-import { AutoFixResult, IssueMetadata } from '@/types/workflow';
-import AutoFixResultDisplay from './AutoFixResultDisplay';
 
 const PipelineRemediationAgent = () => {
   const [input, setInput] = useState<PipelineInput>({
@@ -21,49 +21,36 @@ const PipelineRemediationAgent = () => {
     pipelineType: 'github-actions',
     metadata: {}
   });
-  const [autoFixResult, setAutoFixResult] = useState<AutoFixResult | null>(null);
+  const [result, setResult] = useState<PipelineRemediationResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [testResults, setTestResults] = useState<any[]>([]);
   const { toast } = useToast();
 
-  const handleGenerateFix = async () => {
-    if (!input.config.trim() || !input.filePath.trim()) {
+  const handleRemediate = async () => {
+    if (!input.config.trim()) {
       toast({
-        title: "Missing Information",
-        description: "Please provide a file path and pipeline configuration.",
+        title: "Missing Configuration",
+        description: "Please provide a pipeline configuration to analyze.",
         variant: "destructive"
       });
       return;
     }
 
     setIsLoading(true);
-    setAutoFixResult(null);
-
-    const issue: IssueMetadata = {
-        id: `pipeline-finding-${Date.now()}`,
-        type: 'PIPELINE',
-        severity: 'High', // Defaulting severity for pipelines
-        location: {
-            filePath: input.filePath,
-            repository: 'github.com/example/monitored-app',
-            branch: 'main',
-        },
-        description: `Security risk identified in ${input.filePath}`,
-    };
-
     try {
-      const result = await runAutoFixWorkflow(issue);
-      setAutoFixResult(result);
-      if (result.status !== 'FAILED') {
+      const remediationResult = await pipelineRemediationService.remediatePipeline(input);
+      setResult(remediationResult);
+      
+      if (remediationResult.success) {
         toast({
-          title: "Workflow Complete",
-          description: `Fix is ${result.status.replace('_', ' ').toLowerCase()}.`,
+          title: "Pipeline Analysis Complete",
+          description: `Applied ${remediationResult.appliedRules.length} security fixes.`,
         });
       }
     } catch (error) {
       toast({
-        title: "Workflow Failed",
-        description: "An unexpected error occurred during analysis.",
+        title: "Remediation Failed",
+        description: "An error occurred during pipeline analysis.",
         variant: "destructive"
       });
     } finally {
@@ -144,7 +131,6 @@ jobs:
       pipelineType: type,
       filePath: type === 'github-actions' ? '.github/workflows/ci.yml' : 'Jenkinsfile'
     });
-    setAutoFixResult(null);
   };
 
   const getRiskBadgeColor = (riskLevel: string) => {
@@ -245,9 +231,9 @@ jobs:
                   />
                 </div>
                 
-                <Button onClick={handleGenerateFix} disabled={isLoading} className="w-full">
-                  {isLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Bot className="h-4 w-4 mr-2" />}
-                  {isLoading ? 'Analyzing...' : 'Generate Fix'}
+                <Button onClick={handleRemediate} disabled={isLoading} className="w-full">
+                  <PlayCircle className="h-4 w-4 mr-2" />
+                  {isLoading ? 'Analyzing...' : 'Analyze Pipeline'}
                 </Button>
               </CardContent>
             </Card>
@@ -260,13 +246,69 @@ jobs:
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {!autoFixResult ? (
+                {!result ? (
                   <div className="text-center py-8 text-muted-foreground">
                     <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
                     <p>Configure and analyze a pipeline to see results</p>
                   </div>
                 ) : (
-                  <AutoFixResultDisplay autoFixResult={autoFixResult} />
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      {result.success ? (
+                        <CheckCircle className="h-5 w-5 text-green-500" />
+                      ) : (
+                        <AlertCircle className="h-5 w-5 text-red-500" />
+                      )}
+                      <span className="font-medium">
+                        {result.success ? 'Analysis Complete' : 'Analysis Failed'}
+                      </span>
+                    </div>
+                    
+                    {result.appliedRules.length > 0 && (
+                      <div>
+                        <h4 className="font-medium mb-2">Applied Rules:</h4>
+                        <div className="flex flex-wrap gap-1">
+                          {result.appliedRules.map((ruleId) => (
+                            <Badge key={ruleId} variant="outline" className="text-xs">
+                              {ruleId}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {result.insertedSteps && result.insertedSteps.length > 0 && (
+                      <div>
+                        <h4 className="font-medium mb-2">Inserted Steps:</h4>
+                        <div className="flex flex-wrap gap-1">
+                          {result.insertedSteps.map((step) => (
+                            <Badge key={step} variant="secondary" className="text-xs">
+                              {step}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div>
+                      <h4 className="font-medium mb-2">Explanation:</h4>
+                      <div className="bg-muted p-3 rounded text-sm whitespace-pre-wrap">
+                        {result.explanation}
+                      </div>
+                    </div>
+                    
+                    {result.updatedConfig && (
+                      <div>
+                        <h4 className="font-medium mb-2">Updated Configuration:</h4>
+                        <Textarea
+                          value={result.updatedConfig}
+                          readOnly
+                          rows={8}
+                          className="font-mono text-sm"
+                        />
+                      </div>
+                    )}
+                  </div>
                 )}
               </CardContent>
             </Card>

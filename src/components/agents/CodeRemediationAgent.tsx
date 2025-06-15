@@ -2,13 +2,14 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bot, Loader2, FileCode } from "lucide-react";
+import { Bot, Loader2, FileCode, GitPullRequest } from "lucide-react";
 import { codeTestCases } from '@/lib/code-test-data';
 import { CodeFinding } from '@/types/code';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from '@/components/ui/badge';
 import { runAutoFixWorkflow } from '@/lib/autofix-workflow';
 import { AutoFixResult, IssueMetadata } from '@/types/workflow';
-import AutoFixResultDisplay from './AutoFixResultDisplay';
+import { cn } from '@/lib/utils';
 
 const WorkflowAuditLog = ({ log }: { log: AutoFixResult['auditLog'] }) => (
   <div className="space-y-4 font-mono text-xs bg-muted p-4 rounded-md max-h-96 overflow-y-auto">
@@ -79,7 +80,7 @@ const CodeRemediationAgent = () => {
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="flex items-center gap-4">
-          <Select onValueChange={handleSelectFinding} value={selectedFinding?.findingId || ''}>
+          <Select onValueChange={handleSelectFinding}>
             <SelectTrigger className="w-[400px]">
               <SelectValue placeholder="Select a code finding..." />
             </SelectTrigger>
@@ -121,8 +122,70 @@ const CodeRemediationAgent = () => {
           </Card>
         )}
 
-        <AutoFixResultDisplay autoFixResult={autoFixResult} />
-
+        {autoFixResult && selectedFinding && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Auto-Fix Workflow Result</CardTitle>
+              <CardDescription>{autoFixResult.decision}</CardDescription>
+              <Badge variant={
+                  autoFixResult.status === 'COMPLETED_AUTOMATIC' ? 'default'
+                  : autoFixResult.status === 'AWAITING_APPROVAL' ? 'secondary'
+                  : 'destructive'
+              }>
+                  Status: {autoFixResult.status}
+              </Badge>
+            </CardHeader>
+            <CardContent>
+              <Tabs defaultValue="summary">
+                <TabsList className="grid w-full grid-cols-4">
+                  <TabsTrigger value="summary">Summary</TabsTrigger>
+                  <TabsTrigger value="llm">LLM Details</TabsTrigger>
+                  <TabsTrigger value="mcp">MCP Response</TabsTrigger>
+                  <TabsTrigger value="log">Audit Log</TabsTrigger>
+                </TabsList>
+                <TabsContent value="summary" className="mt-4">
+                  {autoFixResult.status === 'AWAITING_APPROVAL' && autoFixResult.approvalPayload && (
+                    <Card>
+                      <CardHeader><CardTitle className="text-base">Approval Required</CardTitle></CardHeader>
+                      <CardContent>
+                        <p className="text-sm mb-2">The following fix requires manual approval:</p>
+                        <pre className="bg-muted p-4 rounded-md overflow-x-auto text-sm">
+                          <code>{JSON.stringify(autoFixResult.approvalPayload, null, 2)}</code>
+                        </pre>
+                      </CardContent>
+                    </Card>
+                  )}
+                  {autoFixResult.status === 'COMPLETED_AUTOMATIC' && (
+                    <p className="text-sm">This issue was remediated automatically.</p>
+                  )}
+                </TabsContent>
+                <TabsContent value="llm" className="mt-4">
+                  {autoFixResult.llmResponse ? (
+                    <div className="space-y-4">
+                      <p className="text-sm"><strong>Confidence:</strong> {autoFixResult.llmResponse.confidence.toFixed(2)}%</p>
+                      <div>
+                        <p className="font-medium text-sm">Rationale:</p>
+                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">{autoFixResult.llmResponse.rationale}</p>
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">Proposed Fix:</p>
+                        <pre className="bg-muted p-4 rounded-md overflow-x-auto text-sm"><code>{autoFixResult.llmResponse.proposedFix}</code></pre>
+                      </div>
+                    </div>
+                  ) : <p className="text-sm text-muted-foreground">No LLM response available.</p>}
+                </TabsContent>
+                <TabsContent value="mcp" className="mt-4">
+                  {autoFixResult.mcpResponse ? (
+                    <pre className="bg-muted p-4 rounded-md overflow-x-auto text-sm"><code>{JSON.stringify(autoFixResult.mcpResponse, null, 2)}</code></pre>
+                  ) : <p className="text-sm text-muted-foreground">No MCP action was taken.</p>}
+                </TabsContent>
+                <TabsContent value="log" className="mt-4">
+                  <WorkflowAuditLog log={autoFixResult.auditLog} />
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+        )}
       </CardContent>
     </Card>
   );
