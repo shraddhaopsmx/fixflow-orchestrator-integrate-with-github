@@ -1,3 +1,4 @@
+
 import { CodeFinding, CodeRemediation } from '@/types/code';
 
 // This is a mock of a more complex service that would call an LLM.
@@ -12,10 +13,6 @@ class CodeRemediationService {
 
     if (finding.findingId === 'CODE-PY-001') {
       return this.getPythonSqlInjectionFix(finding);
-    }
-
-    if (finding.findingId === 'CODE-PY-002') {
-      return this.getPythonScaFix(finding);
     }
 
     return {
@@ -95,40 +92,6 @@ This is an automated remediation. Please review carefully before merging.
         title: `fix(security): Remediate SQL Injection in ${finding.filePath}`,
         body: prBody,
         labels: [`severity:${finding.vulnerability.severity}`, 'fix-type:sql-injection', 'automated-remediation'],
-      },
-    };
-  }
-
-  private getPythonScaFix(finding: CodeFinding): CodeRemediation {
-    const patch = `
-- requests==2.22.0
-+ requests==2.31.0
-    `;
-    const explanation = 'The version of the "requests" library in use is vulnerable to Remote Code Execution (RCE). This is a critical vulnerability that can allow an attacker to run arbitrary code on the system.\n\nThe fix is to upgrade the library to a patched version (2.31.0 or newer). This is a minimal, safe upgrade that resolves the vulnerability without introducing breaking changes noted in the library\'s changelog.';
-    const prBody = `### Fix for Vulnerability: ${finding.vulnerability.id}
-
-**Vulnerability:** ${finding.vulnerability.name}
-**Severity:** ${finding.vulnerability.severity}
-**File:** \`${finding.filePath}\`
-
-**Description:**
-This PR remediates a critical SCA finding by upgrading a vulnerable dependency.
-
-**Changes:**
-- Upgraded \`requests\` from version 2.22.0 to 2.31.0.
-
-This is an automated remediation. Please review carefully before merging.
-    `;
-
-    return {
-      success: true,
-      explanation,
-      suggestedPatch: patch,
-      githubPr: {
-        url: 'https://github.com/your-org/your-repo/pull/125',
-        title: `fix(deps): Upgrade vulnerable requests package in ${finding.filePath}`,
-        body: prBody,
-        labels: [`severity:${finding.vulnerability.severity}`, 'fix-type:sca', 'dependencies', 'automated-remediation'],
       },
     };
   }
