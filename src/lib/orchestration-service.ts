@@ -1,9 +1,9 @@
-
 import { fetchPrioritizedRisks, RiskIssue } from "./risk-api-client";
 import { fetchContextGraph } from "./context-graph-client";
 import { evaluatePolicy } from "./policy-engine";
 import { logEvent } from "./auditor";
 import { enqueueJob, updateJobStatus, getJob, allJobs, RemediationJob, RemediationJobStatus } from "./queue";
+import { executeFix } from "./fix-executor";
 
 // Domain classifier
 function classifyDomain(source: string): "code" | "iac" | "pipeline" | "cloud" {
@@ -60,8 +60,8 @@ export async function orchestrateRemediation() {
       if (policy.autoRemediate) {
         updateJobStatus(jobId, "approved");
         logEvent({ jobId, action: "job_auto_approved", details: {} });
-        updateJobStatus(jobId, "executed");
-        logEvent({ jobId, action: "job_executed", details: {} });
+        // The fix executor now handles the execution and its logging
+        executeFix(jobId);
       }
     });
   }
@@ -89,14 +89,19 @@ export async function approveJobHandler(req: any, res: any) {
   if (!job.requiresApproval) return res.status(400).json({ error: "Approval not required" });
   updateJobStatus(job.jobId, "approved");
   logEvent({ jobId: job.jobId, action: "job_approved", details: { by: "human" }});
-  // Simulate execution
-  updateJobStatus(job.jobId, "executed");
-  logEvent({ jobId: job.jobId, action: "job_executed", details: {} });
-  res.json({ success: true });
+  
+  // The fix executor handles the execution and returns the outcome
+  const result = await executeFix(job.jobId);
+  
+  if (result.success) {
+    res.json({ success: true, message: "Job executed successfully." });
+  } else {
+    res.status(500).json({ success: false, message: "Job execution failed.", error: result.error });
+  }
 }
 
 export async function auditLogHandler(req: any, res: any) {
   // Optionally filter by job ID
-  const logs = require('./auditor').getAuditLog(req.params.jobId);
+  const logs = require('./auditor').getAuditLog(req.query.jobId);
   res.json(logs);
 }
