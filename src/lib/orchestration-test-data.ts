@@ -1,4 +1,3 @@
-
 import { OrchestrationIssue } from '@/types/orchestration';
 import { codeTestCases } from './code-test-data';
 import { allTestCases as iacTestCases } from './iac-test-data';
@@ -21,7 +20,7 @@ export const orchestrationIssues: OrchestrationIssue[] = [
     type: 'iac',
     description: 'Terraform misconfiguration: public S3 bucket',
     source: 'Prisma Cloud',
-    payload: iacTestCases.find(c => c.name === 'S3 Public Read Access')!.input,
+    payload: iacTestCases.find(c => c.name === 'S3 Bucket with public read access')!.input,
     policy: {
       requiresApproval: true, // Infrastructure change
     },
