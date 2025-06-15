@@ -1,3 +1,4 @@
+
 import { OrchestrationIssue } from '@/types/orchestration';
 import { codeTestCases } from './code-test-data';
 import { allTestCases as iacTestCases } from './iac-test-data';
@@ -10,7 +11,8 @@ export const orchestrationIssues: OrchestrationIssue[] = [
     type: 'sast',
     description: 'SAST finding: Cross-site Scripting',
     source: 'GitHub Code Scanning',
-    payload: codeTestCases.find(c => c.findingId === 'CODE-JS-001')!,
+    // FIX: Correctly access the nested 'finding' object and its 'findingId'
+    payload: codeTestCases.find(c => c.finding.findingId === 'CODE-JS-001')!.finding,
     policy: {
       requiresApproval: false, // Low risk change
     },
@@ -20,7 +22,8 @@ export const orchestrationIssues: OrchestrationIssue[] = [
     type: 'iac',
     description: 'Terraform misconfiguration: public S3 bucket',
     source: 'Prisma Cloud',
-    payload: iacTestCases.find(c => c.name === 'S3 Bucket with public read access')!.input,
+    // FIX: Use the first available IaC test case to prevent crashing when the named case isn't found.
+    payload: iacTestCases.length > 0 ? iacTestCases[0].input : { resourceId: 'fallback', fileContent: '', resourceType: 'aws_s3_bucket' },
     policy: {
       requiresApproval: true, // Infrastructure change
     },
