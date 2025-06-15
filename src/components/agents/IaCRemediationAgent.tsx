@@ -1,14 +1,15 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { FileCode, Play, CheckCircle, XCircle, Code } from 'lucide-react';
-import { IaCInput, IaCRemediationResult } from '@/types/iac';
-import { iacRemediationService } from '@/lib/iac-remediation-service';
+import { FileCode, Bot, Loader2 } from 'lucide-react';
+import { IaCInput } from '@/types/iac';
 import { allTestCases } from '@/lib/iac-test-data';
+import { runAutoFixWorkflow } from '@/lib/autofix-workflow';
+import { AutoFixResult, IssueMetadata } from '@/types/workflow';
+import AutoFixResultDisplay from './AutoFixResultDisplay';
+import { toast } from 'sonner';
 
 const IaCRemediationAgent = () => {
   const [input, setInput] = useState<Partial<IaCInput>>({
@@ -24,27 +25,38 @@ const IaCRemediationAgent = () => {
     }
   });
   
-  const [result, setResult] = useState<IaCRemediationResult | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [autoFixResult, setAutoFixResult] = useState<AutoFixResult | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const [selectedTest, setSelectedTest] = useState<string>('');
 
-  const handleRemediate = async () => {
-    if (!input.filePath || !input.config || !input.issueMetadata) return;
+  const handleGenerateFix = async () => {
+    if (!input.filePath || !input.config || !input.issueMetadata?.issueId) {
+      toast.error("Please fill all required fields or load a test case.");
+      return;
+    }
     
-    setIsProcessing(true);
+    setIsLoading(true);
+    setAutoFixResult(null);
+
+    const issue: IssueMetadata = {
+      id: input.issueMetadata.issueId,
+      type: 'CSPM',
+      severity: input.issueMetadata.severity,
+      location: {
+        filePath: input.filePath,
+        repository: 'github.com/example/iac-repo',
+        branch: 'main',
+      },
+      description: input.issueMetadata.description || input.issueMetadata.title || 'IaC Misconfiguration',
+    };
+
     try {
-      const remediationResult = await iacRemediationService.remediateConfiguration(input as IaCInput);
-      setResult(remediationResult);
+      const result = await runAutoFixWorkflow(issue);
+      setAutoFixResult(result);
     } catch (error) {
-      console.error('Remediation failed:', error);
-      setResult({
-        success: false,
-        explanation: 'Failed to process configuration',
-        appliedRules: [],
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
+       toast.error(error instanceof Error ? error.message : "An unexpected error occurred.");
     } finally {
-      setIsProcessing(false);
+      setIsLoading(false);
     }
   };
 
@@ -52,7 +64,7 @@ const IaCRemediationAgent = () => {
     const testCase = allTestCases.find(t => t.name === testName);
     if (testCase) {
       setInput(testCase.input);
-      setResult(null);
+      setAutoFixResult(null);
       setSelectedTest(testName);
     }
   };
@@ -190,19 +202,19 @@ const IaCRemediationAgent = () => {
 
           <div className="flex justify-end pt-4">
             <Button 
-              onClick={handleRemediate}
-              disabled={!input.filePath || !input.config || isProcessing}
+              onClick={handleGenerateFix}
+              disabled={!input.filePath || !input.config || isLoading}
               className="flex items-center gap-2"
             >
-              {isProcessing ? (
+              {isLoading ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin" />
                   Processing...
                 </>
               ) : (
                 <>
-                  <Play className="h-4 w-4" />
-                  Remediate
+                  <Bot className="h-4 w-4" />
+                  Generate Fix
                 </>
               )}
             </Button>
@@ -210,68 +222,8 @@ const IaCRemediationAgent = () => {
         </CardContent>
       </Card>
 
-      {result && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              {result.success ? (
-                <CheckCircle className="h-5 w-5 text-green-600" />
-              ) : (
-                <XCircle className="h-5 w-5 text-red-600" />
-              )}
-              <CardTitle>Remediation Result</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center gap-2">
-              <Badge variant={result.success ? "default" : "destructive"}>
-                {result.success ? "Success" : "Failed"}
-              </Badge>
-              {result.appliedRules.length > 0 && (
-                <Badge variant="outline">
-                  {result.appliedRules.length} rule{result.appliedRules.length > 1 ? 's' : ''} applied
-                </Badge>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Explanation</label>
-              <div className="p-3 bg-muted rounded-md text-sm whitespace-pre-wrap">
-                {result.explanation}
-              </div>
-            </div>
-
-            {result.updatedConfig && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Updated Configuration</label>
-                <Textarea
-                  className="min-h-[200px] font-mono text-sm"
-                  value={result.updatedConfig}
-                  readOnly
-                />
-              </div>
-            )}
-
-            {result.jsonPatch && result.jsonPatch.length > 0 && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium">JSON Patches</label>
-                <pre className="p-3 bg-muted rounded-md text-sm overflow-x-auto">
-                  {JSON.stringify(result.jsonPatch, null, 2)}
-                </pre>
-              </div>
-            )}
-
-            {result.error && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-red-600">Error Details</label>
-                <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
-                  {result.error}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+      <AutoFixResultDisplay autoFixResult={autoFixResult} />
+      
     </div>
   );
 };

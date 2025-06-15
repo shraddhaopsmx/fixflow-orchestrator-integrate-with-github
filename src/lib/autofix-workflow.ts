@@ -4,12 +4,77 @@ import {
   AutoFixResult,
   IssueMetadata,
   MCPPayload,
+  LLMResponse,
 } from "@/types/workflow";
 import { contextGraphAPI } from "./context-graph-api";
 import { llmClient } from "./llm-client";
 import { mcpClient } from "./mcp-client";
 
 const CONFIDENCE_THRESHOLD = 90;
+
+const getMcpActionAndPayload = (issue: IssueMetadata, llmResponse: LLMResponse): MCPPayload => {
+  const commitMessage = `fix: remediate ${issue.id} - ${issue.description.slice(0, 50)}`;
+
+  switch (issue.type) {
+    case 'SCA':
+    case 'SAST':
+      return {
+        type: 'gitops/apply-patch',
+        payload: {
+          repository: issue.location.repository,
+          branch: issue.location.branch || 'main',
+          patch: llmResponse.proposedFix,
+          commitMessage,
+        },
+      };
+    case 'CSPM':
+      if (issue.location.filePath) { // This implies IaC
+        return {
+          type: 'iac/commit-patch',
+          payload: {
+            repository: issue.location.repository,
+            branch: issue.location.branch || 'main',
+            filePath: issue.location.filePath,
+            patch: llmResponse.proposedFix,
+            commitMessage,
+          },
+        };
+      }
+      // This implies a cloud resource
+      return {
+        type: 'cloud/apply-remediation',
+        payload: {
+          resourceId: issue.location.resourceId,
+          region: issue.location.region,
+          remediationScript: llmResponse.proposedFix,
+        },
+      };
+    case 'PIPELINE':
+      return {
+        type: 'pipeline/update-config',
+        payload: {
+          repository: issue.location.repository,
+          branch: issue.location.branch || 'main',
+          filePath: issue.location.filePath,
+          patch: llmResponse.proposedFix,
+          commitMessage,
+        },
+      };
+    case 'RUNTIME':
+      return {
+        type: 'runtime/isolate',
+        payload: {
+          resourceId: issue.location.resourceId,
+          reason: llmResponse.rationale,
+          action: llmResponse.proposedFix,
+        },
+      };
+    default:
+      const unhandledType: never = issue.type;
+      throw new Error(`Unsupported issue type for MCP action: ${unhandledType}`);
+  }
+};
+
 
 export const runAutoFixWorkflow = async (
   issue: IssueMetadata
@@ -28,7 +93,7 @@ export const runAutoFixWorkflow = async (
     const context = await contextGraphAPI.fetchEnrichment(issue);
     log('Context received', context);
 
-    const prompt = llmClient.getPrompt('SCA', context, issue.description);
+    const prompt = llmClient.getPrompt(issue, context);
     log('Generating LLM prompt', { prompt });
     const llmResponse = await llmClient.generateFix(prompt);
     log('LLM response received', llmResponse);
@@ -36,15 +101,8 @@ export const runAutoFixWorkflow = async (
     if (llmResponse.confidence >= CONFIDENCE_THRESHOLD) {
       log('Confidence above threshold', { confidence: llmResponse.confidence, threshold: CONFIDENCE_THRESHOLD });
       
-      const mcpPayload: MCPPayload = {
-        type: 'gitops/apply-patch',
-        payload: {
-          repository: issue.location.repository,
-          branch: 'main',
-          patch: llmResponse.proposedFix,
-          commitMessage: `fix: remediate ${issue.id}`,
-        }
-      };
+      const mcpPayload = getMcpActionAndPayload(issue, llmResponse);
+
       log('Sending fix to MCP', mcpPayload);
       const mcpResponse = await mcpClient.applyPatch(mcpPayload.type, mcpPayload.payload);
       log('MCP response received', mcpResponse);

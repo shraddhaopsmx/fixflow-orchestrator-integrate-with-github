@@ -1,15 +1,14 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cloudTestCases } from '@/lib/cloud-test-data';
-import { cloudRemediationService } from '@/lib/cloud-remediation-service';
-import { CSPMFinding, RemediationPlan } from '@/types/cloud';
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Terminal } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from '../ui/badge';
+import { Bot, Loader2 } from 'lucide-react';
+import { runAutoFixWorkflow } from '@/lib/autofix-workflow';
+import { AutoFixResult, IssueMetadata } from '@/types/workflow';
+import AutoFixResultDisplay from './AutoFixResultDisplay';
 
 const CodeBlock = ({ code, lang }: { code: string, lang: string }) => (
   <pre className="bg-gray-900 text-white font-mono text-sm rounded-md p-4 overflow-x-auto">
@@ -19,25 +18,36 @@ const CodeBlock = ({ code, lang }: { code: string, lang: string }) => (
 
 const CloudRemediationAgent = () => {
   const [selectedFindingId, setSelectedFindingId] = useState<string | null>(null);
-  const [remediationPlan, setRemediationPlan] = useState<RemediationPlan | null>(null);
+  const [autoFixResult, setAutoFixResult] = useState<AutoFixResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const selectedFinding = cloudTestCases.find(f => f.findingId === selectedFindingId);
 
-  const handleRemediate = async () => {
+  const handleGenerateFix = async () => {
     if (!selectedFinding) return;
 
     setIsLoading(true);
-    setRemediationPlan(null);
+    setAutoFixResult(null);
     toast.info("Generating remediation plan...");
     
+    const issue: IssueMetadata = {
+      id: selectedFinding.findingId,
+      type: 'CSPM',
+      severity: selectedFinding.severity,
+      location: {
+        resourceId: selectedFinding.resourceId,
+        region: selectedFinding.region,
+      },
+      description: selectedFinding.description,
+    };
+
     try {
-      const plan = await cloudRemediationService.remediate(selectedFinding);
-      setRemediationPlan(plan);
-      if (plan.success) {
-        toast.success("Remediation plan generated successfully!");
+      const result = await runAutoFixWorkflow(issue);
+      setAutoFixResult(result);
+      if (result.status === 'COMPLETED_AUTOMATIC' || result.status === 'AWAITING_APPROVAL') {
+        toast.success("Workflow finished successfully!");
       } else {
-        toast.error(`Failed to generate plan: ${plan.error}`);
+        toast.error(`Workflow failed: ${result.error}`);
       }
     } catch (e) {
       toast.error("An unexpected error occurred.");
@@ -55,6 +65,11 @@ const CloudRemediationAgent = () => {
     }
   }
 
+  const handleSelectFinding = (findingId: string) => {
+    setSelectedFindingId(findingId);
+    setAutoFixResult(null);
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -63,7 +78,7 @@ const CloudRemediationAgent = () => {
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="flex items-center gap-4">
-          <Select onValueChange={setSelectedFindingId} value={selectedFindingId || ''}>
+          <Select onValueChange={handleSelectFinding} value={selectedFindingId || ''}>
             <SelectTrigger className="w-[350px]">
               <SelectValue placeholder="Select a test finding..." />
             </SelectTrigger>
@@ -75,8 +90,9 @@ const CloudRemediationAgent = () => {
               ))}
             </SelectContent>
           </Select>
-          <Button onClick={handleRemediate} disabled={!selectedFindingId || isLoading}>
-            {isLoading ? "Generating..." : "Generate Remediation Plan"}
+          <Button onClick={handleGenerateFix} disabled={!selectedFindingId || isLoading}>
+            {isLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Bot className="h-4 w-4 mr-2" />}
+            {isLoading ? "Generating..." : "Generate Fix"}
           </Button>
         </div>
 
@@ -96,34 +112,8 @@ const CloudRemediationAgent = () => {
           </Card>
         )}
 
-        {remediationPlan && (
-          <div className="space-y-4">
-            <Alert variant={remediationPlan.success ? "default" : "destructive"}>
-              <Terminal className="h-4 w-4" />
-              <AlertTitle>{remediationPlan.success ? "Plan Generated" : "Error"}</AlertTitle>
-              <AlertDescription>
-                {remediationPlan.explanation}
-              </AlertDescription>
-            </Alert>
-            
-            {remediationPlan.success && (
-              <div className="space-y-4">
-                <div>
-                  <h3 className="font-semibold mb-2">Fix ({remediationPlan.remediation.type})</h3>
-                  <p className="text-sm text-muted-foreground mb-2">{remediationPlan.remediation.description}</p>
-                  <CodeBlock code={remediationPlan.remediation.code} lang={remediationPlan.remediation.type.toLowerCase()} />
-                </div>
-                {remediationPlan.rollback && (
-                  <div>
-                    <h3 className="font-semibold mb-2">Rollback ({remediationPlan.rollback.type})</h3>
-                    <p className="text-sm text-muted-foreground mb-2">{remediationPlan.rollback.description}</p>
-                    <CodeBlock code={remediationPlan.rollback.code} lang={remediationPlan.rollback.type.toLowerCase()} />
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
+        <AutoFixResultDisplay autoFixResult={autoFixResult} />
+
       </CardContent>
     </Card>
   );
