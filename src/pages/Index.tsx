@@ -3,7 +3,7 @@ import DashboardCard from "@/components/dashboard/DashboardCard";
 import RiskTable from "@/components/dashboard/RiskTable";
 import RiskTrendChart from "@/components/dashboard/RiskTrendChart";
 import { agents, risks } from "@/lib/mock-data";
-import { Code, Cloud, FileCode, CloudUpload, Shield, Folder } from "lucide-react";
+import { Code, Cloud, FileCode, CloudUpload, Shield, Folder, FolderCode } from "lucide-react";
 
 const Index = () => {
     const openRisks = risks.filter(r => r.status === 'Open' || r.status === 'In Progress');
