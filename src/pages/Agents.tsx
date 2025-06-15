@@ -3,11 +3,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { agents } from "@/lib/mock-data";
-import { Settings, Play, Pause, Activity } from "lucide-react";
+import { agents as existingAgents } from "@/lib/mock-data";
+import { Settings, Play, Pause, Activity, Cloud } from "lucide-react";
 import IaCRemediationAgent from "@/components/agents/IaCRemediationAgent";
 import PipelineRemediationAgent from "@/components/agents/PipelineRemediationAgent";
 import RuntimeRemediationAgent from "@/components/agents/RuntimeRemediationAgent";
+import CloudRemediationAgent from "@/components/agents/CloudRemediationAgent";
+import { Agent } from "@/types";
 
 const Agents = () => {
   const getStatusColor = (status: string) => {
@@ -18,6 +20,12 @@ const Agents = () => {
       default: return 'bg-yellow-500';
     }
   };
+
+  const agents: Agent[] = [...existingAgents, {
+    name: 'Cloud',
+    icon: Cloud,
+    description: 'Remediates cloud security misconfigurations in AWS.'
+  }];
 
   return (
     <>
@@ -35,11 +43,12 @@ const Agents = () => {
       </div>
 
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="iac-agent">IaC Agent</TabsTrigger>
           <TabsTrigger value="pipeline-agent">Pipeline Agent</TabsTrigger>
           <TabsTrigger value="runtime-agent">Runtime Agent</TabsTrigger>
+          <TabsTrigger value="cloud-agent">Cloud Agent</TabsTrigger>
           <TabsTrigger value="performance">Performance</TabsTrigger>
         </TabsList>
         
@@ -101,6 +110,10 @@ const Agents = () => {
         
         <TabsContent value="runtime-agent">
           <RuntimeRemediationAgent />
+        </TabsContent>
+
+        <TabsContent value="cloud-agent">
+          <CloudRemediationAgent />
         </TabsContent>
         
         <TabsContent value="performance" className="space-y-4">
