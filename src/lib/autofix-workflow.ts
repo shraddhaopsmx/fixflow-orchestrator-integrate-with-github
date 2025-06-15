@@ -3,6 +3,7 @@ import {
   AuditLogEntry,
   AutoFixResult,
   IssueMetadata,
+  MCPPayload,
 } from "@/types/workflow";
 import { contextGraphAPI } from "./context-graph-api";
 import { llmClient } from "./llm-client";
@@ -35,7 +36,7 @@ export const runAutoFixWorkflow = async (
     if (llmResponse.confidence >= CONFIDENCE_THRESHOLD) {
       log('Confidence above threshold', { confidence: llmResponse.confidence, threshold: CONFIDENCE_THRESHOLD });
       
-      const mcpPayload = {
+      const mcpPayload: MCPPayload = {
         type: 'gitops/apply-patch',
         payload: {
           repository: issue.location.repository,
@@ -92,4 +93,3 @@ export const runAutoFixWorkflow = async (
     };
   }
 };
-
