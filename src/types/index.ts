@@ -12,7 +12,7 @@ export type Risk = {
 };
 
 export type Agent = {
-    name: 'Code' | 'IaC' | 'Pipeline' | 'Cloud' | 'Runtime' | 'Orchestrator';
+    name: 'Code' | 'IaC' | 'Pipeline' | 'Cloud' | 'Runtime';
     icon: LucideIcon;
     description: string;
 }
