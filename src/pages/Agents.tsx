@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { agents } from "@/lib/mock-data";
 import { Settings, Play, Pause, Activity } from "lucide-react";
 import IaCRemediationAgent from "@/components/agents/IaCRemediationAgent";
+import PipelineRemediationAgent from "@/components/agents/PipelineRemediationAgent";
 
 const Agents = () => {
   const getStatusColor = (status: string) => {
@@ -33,9 +34,10 @@ const Agents = () => {
       </div>
 
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="iac-agent">IaC Agent</TabsTrigger>
+          <TabsTrigger value="pipeline-agent">Pipeline Agent</TabsTrigger>
           <TabsTrigger value="performance">Performance</TabsTrigger>
         </TabsList>
         
@@ -89,6 +91,10 @@ const Agents = () => {
         
         <TabsContent value="iac-agent">
           <IaCRemediationAgent />
+        </TabsContent>
+        
+        <TabsContent value="pipeline-agent">
+          <PipelineRemediationAgent />
         </TabsContent>
         
         <TabsContent value="performance" className="space-y-4">
