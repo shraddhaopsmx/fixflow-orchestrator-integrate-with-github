@@ -4,6 +4,7 @@ export interface RuntimeAlert {
   description: string;
   suggestedAction: RuntimeActionType;
   defaultConfidence: number; // A value between 0 and 100
+  affectedResource: string;
 }
 
 export type RuntimeActionType = 'ISOLATE_CONTAINER' | 'DISABLE_USER' | 'TERMINATE_PROCESS' | 'NO_ACTION' | 'ESCALATED';
