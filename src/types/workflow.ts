@@ -13,6 +13,10 @@ export interface IssueMetadata {
     region?: string;
   };
   description: string;
+  riskScore?: number;
+  codeSnippet?: string;
+  language?: string;
+  fileOwner?: string;
 }
 
 export interface ContextGraphData {
@@ -56,6 +60,14 @@ export interface AuditLogEntry {
   details: any;
 }
 
+export interface RemediationMetrics {
+  timeToFix: number; // in milliseconds
+  successRate: number;
+  llmAccuracy: number;
+  workflowStartTime: number;
+  workflowEndTime: number;
+}
+
 export interface AutoFixResult {
   workflowId: string;
   issueId: string;
@@ -67,5 +79,5 @@ export interface AutoFixResult {
   approvalPayload?: any;
   auditLog: AuditLogEntry[];
   error?: string;
+  metrics?: RemediationMetrics;
 }
-

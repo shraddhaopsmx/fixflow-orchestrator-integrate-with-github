@@ -3,28 +3,14 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bot, Loader2, FileCode, GitPullRequest } from "lucide-react";
+import { Bot, Loader2, FileCode, GitPullRequest, Clock, TrendingUp, Target } from "lucide-react";
 import { codeTestCases } from '@/lib/code-test-data';
 import { CodeFinding } from '@/types/code';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from '@/components/ui/badge';
 import { runAutoFixWorkflow } from '@/lib/autofix-workflow';
 import { AutoFixResult, IssueMetadata } from '@/types/workflow';
-import { cn } from '@/lib/utils';
-
-const WorkflowAuditLog = ({ log }: { log: AutoFixResult['auditLog'] }) => (
-  <div className="space-y-4 font-mono text-xs bg-muted p-4 rounded-md max-h-96 overflow-y-auto">
-    {log.map((entry, index) => (
-      <div key={index}>
-        <p className="text-muted-foreground">{entry.timestamp}</p>
-        <p><span className="font-semibold">[{entry.actor}]</span> - {entry.action}</p>
-        <pre className="mt-1 p-2 bg-background rounded-md overflow-x-auto">
-          {JSON.stringify(entry.details, null, 2)}
-        </pre>
-      </div>
-    ))}
-  </div>
-);
+import AutoFixResultDisplay from './AutoFixResultDisplay';
 
 const CodeRemediationAgent = () => {
   const [selectedFinding, setSelectedFinding] = useState<CodeFinding | null>(null);
@@ -37,12 +23,24 @@ const CodeRemediationAgent = () => {
     setAutoFixResult(null);
   };
 
+  const generateRiskScore = (severity: 'Critical' | 'High' | 'Medium' | 'Low'): number => {
+    switch (severity) {
+      case 'Critical': return 0.9 + Math.random() * 0.1;
+      case 'High': return 0.7 + Math.random() * 0.2;
+      case 'Medium': return 0.4 + Math.random() * 0.3;
+      case 'Low': return 0.1 + Math.random() * 0.3;
+      default: return 0.5;
+    }
+  };
+
   const handleGenerateFix = async () => {
     if (!selectedFinding) return;
     setIsLoading(true);
     setAutoFixResult(null);
     
-    // Create issue metadata for the AutoFixWorkflow
+    const riskScore = generateRiskScore(selectedFinding.vulnerability.severity);
+    
+    // Create enriched issue metadata
     const issue: IssueMetadata = {
         id: selectedFinding.findingId,
         type: 'SCA',
@@ -53,15 +51,15 @@ const CodeRemediationAgent = () => {
             branch: 'main',
         },
         description: `${selectedFinding.vulnerability.name} (${selectedFinding.vulnerability.id})`,
+        riskScore,
+        codeSnippet: selectedFinding.snippet,
+        language: selectedFinding.language,
+        fileOwner: 'jane.doe@example.com'
     };
 
-    console.log('[CodeRemediationAgent] Starting AutoFixWorkflow for SAST/SCA issue:', issue);
+    console.log('[CodeRemediationAgent] Starting enhanced AutoFixWorkflow for enriched issue:', issue);
     
     try {
-      // Invoke the AutoFixWorkflow which will:
-      // 1. Use Context Graph to retrieve code owner, git repo, commit history
-      // 2. Ask LLM for secure upgrade proposal
-      // 3. Apply high-confidence fixes via MCP or route to approval
       const result = await runAutoFixWorkflow(issue);
       console.log('[CodeRemediationAgent] AutoFixWorkflow completed:', result);
       setAutoFixResult(result);
@@ -82,6 +80,12 @@ const CodeRemediationAgent = () => {
     }
   };
 
+  const getRiskScoreColor = (score: number) => {
+    if (score >= 0.8) return 'text-red-600';
+    if (score >= 0.5) return 'text-yellow-600';
+    return 'text-green-600';
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -89,7 +93,7 @@ const CodeRemediationAgent = () => {
           <FileCode className="h-6 w-6" /> Code Remediation Agent
         </CardTitle>
         <CardDescription>
-          Select a SAST/SCA finding to generate an automated pull request with the suggested fix using our enhanced AutoFix workflow.
+          Select a SAST/SCA finding to generate automated remediation based on risk score thresholds using our enhanced AutoFix workflow.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -125,181 +129,84 @@ const CodeRemediationAgent = () => {
                   {selectedFinding.vulnerability.severity}
                 </Badge>
                 <span>ID: {selectedFinding.vulnerability.id}</span>
+                <Badge variant="outline" className={`${getRiskScoreColor(generateRiskScore(selectedFinding.vulnerability.severity))}`}>
+                  Risk: {generateRiskScore(selectedFinding.vulnerability.severity).toFixed(2)}
+                </Badge>
               </div>
             </CardHeader>
             <CardContent>
-              <p className="font-mono text-sm bg-background p-2 rounded">
-                {selectedFinding.filePath}:{selectedFinding.startLine}
-              </p>
-              <pre className="mt-2 bg-background p-4 rounded-md overflow-x-auto">
-                <code className={`language-${selectedFinding.language.toLowerCase()}`}>{selectedFinding.snippet}</code>
-              </pre>
+              <div className="space-y-4">
+                <div>
+                  <p className="font-mono text-sm bg-background p-2 rounded">
+                    {selectedFinding.filePath}:{selectedFinding.startLine}
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Owner: jane.doe@example.com
+                  </p>
+                </div>
+                <pre className="bg-background p-4 rounded-md overflow-x-auto">
+                  <code className={`language-${selectedFinding.language.toLowerCase()}`}>{selectedFinding.snippet}</code>
+                </pre>
+              </div>
             </CardContent>
           </Card>
         )}
 
         {autoFixResult && selectedFinding && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <GitPullRequest className="h-5 w-5" />
-                AutoFix Workflow Result
-              </CardTitle>
-              <CardDescription>{autoFixResult.decision}</CardDescription>
-              <Badge variant={
-                  autoFixResult.status === 'COMPLETED_AUTOMATIC' ? 'default'
-                  : autoFixResult.status === 'AWAITING_APPROVAL' ? 'secondary'
-                  : 'destructive'
-              }>
-                  Status: {autoFixResult.status}
-              </Badge>
-            </CardHeader>
-            <CardContent>
-              <Tabs defaultValue="summary">
-                <TabsList className="grid w-full grid-cols-5">
-                  <TabsTrigger value="summary">Summary</TabsTrigger>
-                  <TabsTrigger value="context">Context</TabsTrigger>
-                  <TabsTrigger value="llm">LLM Response</TabsTrigger>
-                  <TabsTrigger value="mcp">MCP Action</TabsTrigger>
-                  <TabsTrigger value="log">Full Audit Log</TabsTrigger>
-                </TabsList>
-                
-                <TabsContent value="summary" className="mt-4">
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <p className="font-medium">Workflow ID:</p>
-                        <p className="text-muted-foreground font-mono">{autoFixResult.workflowId}</p>
+          <div className="space-y-4">
+            <AutoFixResultDisplay result={autoFixResult} />
+            
+            {autoFixResult.metrics && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5" />
+                    Remediation Metrics
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        <span className="text-2xl font-bold">
+                          {(autoFixResult.metrics.timeToFix / 1000).toFixed(1)}s
+                        </span>
                       </div>
-                      <div>
-                        <p className="font-medium">Issue ID:</p>
-                        <p className="text-muted-foreground">{autoFixResult.issueId}</p>
-                      </div>
+                      <div className="text-sm text-muted-foreground">Time to Fix</div>
                     </div>
-                    
-                    {autoFixResult.status === 'AWAITING_APPROVAL' && autoFixResult.approvalPayload && (
-                      <Card>
-                        <CardHeader><CardTitle className="text-base">Manual Approval Required</CardTitle></CardHeader>
-                        <CardContent>
-                          <p className="text-sm mb-2">The following fix requires manual review and approval:</p>
-                          <pre className="bg-muted p-4 rounded-md overflow-x-auto text-sm">
-                            <code>{JSON.stringify(autoFixResult.approvalPayload, null, 2)}</code>
-                          </pre>
-                        </CardContent>
-                      </Card>
-                    )}
-                    
-                    {autoFixResult.status === 'COMPLETED_AUTOMATIC' && (
-                      <div className="p-4 bg-green-50 border border-green-200 rounded-md">
-                        <p className="text-sm text-green-800">
-                          ✅ This SAST/SCA issue was automatically remediated and a PR was submitted to the repository.
-                        </p>
+                    <div className="text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <Target className="h-4 w-4" />
+                        <span className="text-2xl font-bold text-green-600">
+                          {autoFixResult.metrics.llmAccuracy.toFixed(1)}%
+                        </span>
                       </div>
-                    )}
-                    
-                    {autoFixResult.error && (
-                      <div className="p-4 bg-red-50 border border-red-200 rounded-md">
-                        <p className="text-sm text-red-800">❌ Error: {autoFixResult.error}</p>
+                      <div className="text-sm text-muted-foreground">LLM Accuracy</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <TrendingUp className="h-4 w-4" />
+                        <span className="text-2xl font-bold text-blue-600">
+                          {autoFixResult.metrics.successRate}%
+                        </span>
                       </div>
-                    )}
+                      <div className="text-sm text-muted-foreground">Success Rate</div>
+                    </div>
                   </div>
-                </TabsContent>
-                
-                <TabsContent value="context" className="mt-4">
-                  {autoFixResult.context ? (
-                    <div className="space-y-4">
-                      <div>
-                        <p className="font-medium text-sm mb-2">Application Context:</p>
-                        <div className="bg-muted p-4 rounded-md text-sm">
-                          <p><strong>Name:</strong> {autoFixResult.context.application.name}</p>
-                          <p><strong>Structure:</strong> {autoFixResult.context.application.structure}</p>
-                        </div>
-                      </div>
-                      <div>
-                        <p className="font-medium text-sm mb-2">Code Ownership:</p>
-                        <div className="bg-muted p-4 rounded-md text-sm">
-                          <p><strong>Team:</strong> {autoFixResult.context.ownership.team}</p>
-                          <p><strong>Owner:</strong> {autoFixResult.context.ownership.owner}</p>
-                        </div>
-                      </div>
-                      <div>
-                        <p className="font-medium text-sm mb-2">Git Repository:</p>
-                        <div className="bg-muted p-4 rounded-md text-sm">
-                          <p><strong>URL:</strong> {autoFixResult.context.git.repoUrl}</p>
-                          <p><strong>Recent Commits:</strong></p>
-                          <ul className="list-disc list-inside ml-2">
-                            {autoFixResult.context.git.commitHistory.map((commit, index) => (
-                              <li key={index}>{commit}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      </div>
+                  
+                  <div className="mt-4 p-4 bg-muted rounded-md">
+                    <h4 className="font-medium text-sm mb-2">Processing Details:</h4>
+                    <div className="text-xs space-y-1">
+                      <p>Workflow Start: {new Date(autoFixResult.metrics.workflowStartTime).toLocaleTimeString()}</p>
+                      <p>Workflow End: {new Date(autoFixResult.metrics.workflowEndTime).toLocaleTimeString()}</p>
+                      <p>Processing Time: {autoFixResult.metrics.timeToFix}ms</p>
                     </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No context data available.</p>
-                  )}
-                </TabsContent>
-                
-                <TabsContent value="llm" className="mt-4">
-                  {autoFixResult.llmResponse ? (
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-4">
-                        <p className="text-sm"><strong>Confidence Score:</strong> {autoFixResult.llmResponse.confidence.toFixed(1)}%</p>
-                        <Badge variant={autoFixResult.llmResponse.confidence >= 90 ? 'default' : 'secondary'}>
-                          {autoFixResult.llmResponse.confidence >= 90 ? 'High Confidence' : 'Low Confidence'}
-                        </Badge>
-                      </div>
-                      <div>
-                        <p className="font-medium text-sm mb-2">LLM Rationale:</p>
-                        <div className="bg-muted p-4 rounded-md text-sm">
-                          <p className="whitespace-pre-wrap">{autoFixResult.llmResponse.rationale}</p>
-                        </div>
-                      </div>
-                      <div>
-                        <p className="font-medium text-sm mb-2">Proposed Fix (Patch):</p>
-                        <pre className="bg-muted p-4 rounded-md overflow-x-auto text-sm">
-                          <code>{autoFixResult.llmResponse.proposedFix}</code>
-                        </pre>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No LLM response available.</p>
-                  )}
-                </TabsContent>
-                
-                <TabsContent value="mcp" className="mt-4">
-                  {autoFixResult.mcpResponse ? (
-                    <div className="space-y-4">
-                      <div>
-                        <p className="font-medium text-sm mb-2">MCP Job Status:</p>
-                        <div className="flex items-center gap-2">
-                          <Badge variant={autoFixResult.mcpResponse.status === 'SUCCESS' ? 'default' : 'destructive'}>
-                            {autoFixResult.mcpResponse.status}
-                          </Badge>
-                          <span className="text-sm text-muted-foreground">Job ID: {autoFixResult.mcpResponse.jobId}</span>
-                        </div>
-                      </div>
-                      <div>
-                        <p className="font-medium text-sm mb-2">MCP Response Details:</p>
-                        <div className="bg-muted p-4 rounded-md text-sm">
-                          <p>{autoFixResult.mcpResponse.details}</p>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No MCP action was taken for this issue.</p>
-                  )}
-                </TabsContent>
-                
-                <TabsContent value="log" className="mt-4">
-                  <div>
-                    <p className="font-medium text-sm mb-4">Complete Remediation Log:</p>
-                    <WorkflowAuditLog log={autoFixResult.auditLog} />
                   </div>
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         )}
       </CardContent>
     </Card>
