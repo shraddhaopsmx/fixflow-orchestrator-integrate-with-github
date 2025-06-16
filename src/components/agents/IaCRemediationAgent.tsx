@@ -44,7 +44,7 @@ const IaCRemediationAgent = () => {
   const [autoFixResult, setAutoFixResult] = useState<any>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedTest, setSelectedTest] = useState<string>('');
-  const [activeTab, setActiveTab] = useState<'cspm' | 'manual'>('csmp');
+  const [activeTab, setActiveTab] = useState<'cspm' | 'manual'>('cspm');
 
   const handleCSPMRemediation = async () => {
     if (!cspmIssue.id || !cspmIssue.location?.filePath || !cspmIssue.description) return;
@@ -116,7 +116,7 @@ const IaCRemediationAgent = () => {
       setCspmIssue(prev => ({
         ...prev,
         [parent]: {
-          ...prev[parent as keyof typeof prev],
+          ...(prev[parent as keyof typeof prev] as any),
           [child]: value
         }
       }));
@@ -192,12 +192,12 @@ const IaCRemediationAgent = () => {
         <CardContent>
           <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'cspm' | 'manual')} className="w-full">
             <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="csmp">CSPM Issues</TabsTrigger>
+              <TabsTrigger value="cspm">CSPM Issues</TabsTrigger>
               <TabsTrigger value="manual">Manual Input</TabsTrigger>
               <TabsTrigger value="test">Test Cases</TabsTrigger>
             </TabsList>
             
-            <TabsContent value="csmp" className="space-y-4">
+            <TabsContent value="cspm" className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Issue ID</label>
@@ -205,7 +205,7 @@ const IaCRemediationAgent = () => {
                     type="text"
                     placeholder="e.g., CSPM-001"
                     className="w-full px-3 py-2 border rounded-md"
-                    value={csmpIssue.id || ''}
+                    value={cspmIssue.id || ''}
                     onChange={(e) => updateCSPMIssue('id', e.target.value)}
                   />
                 </div>
@@ -213,7 +213,7 @@ const IaCRemediationAgent = () => {
                   <label className="text-sm font-medium">Severity</label>
                   <select
                     className="w-full px-3 py-2 border rounded-md"
-                    value={csmpIssue.severity || 'Medium'}
+                    value={cspmIssue.severity || 'Medium'}
                     onChange={(e) => updateCSPMIssue('severity', e.target.value)}
                   >
                     <option value="Critical">Critical</option>
@@ -231,7 +231,7 @@ const IaCRemediationAgent = () => {
                     type="text"
                     placeholder="e.g., terraform/main.tf"
                     className="w-full px-3 py-2 border rounded-md"
-                    value={csmpIssue.location?.filePath || ''}
+                    value={cspmIssue.location?.filePath || ''}
                     onChange={(e) => updateCSPMIssue('location.filePath', e.target.value)}
                   />
                 </div>
@@ -241,7 +241,7 @@ const IaCRemediationAgent = () => {
                     type="text"
                     placeholder="e.g., my-app-repo"
                     className="w-full px-3 py-2 border rounded-md"
-                    value={csmpIssue.location?.repository || ''}
+                    value={cspmIssue.location?.repository || ''}
                     onChange={(e) => updateCSPMIssue('location.repository', e.target.value)}
                   />
                 </div>
@@ -251,7 +251,7 @@ const IaCRemediationAgent = () => {
                     type="text"
                     placeholder="e.g., main"
                     className="w-full px-3 py-2 border rounded-md"
-                    value={csmpIssue.location?.branch || 'main'}
+                    value={cspmIssue.location?.branch || 'main'}
                     onChange={(e) => updateCSPMIssue('location.branch', e.target.value)}
                   />
                 </div>
@@ -264,7 +264,7 @@ const IaCRemediationAgent = () => {
                     type="text"
                     placeholder="e.g., aws_s3_bucket.example"
                     className="w-full px-3 py-2 border rounded-md"
-                    value={csmpIssue.location?.resourceId || ''}
+                    value={cspmIssue.location?.resourceId || ''}
                     onChange={(e) => updateCSPMIssue('location.resourceId', e.target.value)}
                   />
                 </div>
@@ -274,7 +274,7 @@ const IaCRemediationAgent = () => {
                     type="text"
                     placeholder="e.g., us-east-1"
                     className="w-full px-3 py-2 border rounded-md"
-                    value={csmpIssue.location?.region || 'us-east-1'}
+                    value={cspmIssue.location?.region || 'us-east-1'}
                     onChange={(e) => updateCSPMIssue('location.region', e.target.value)}
                   />
                 </div>
@@ -285,7 +285,7 @@ const IaCRemediationAgent = () => {
                 <Textarea
                   placeholder="Describe the CSPM security issue..."
                   className="min-h-[100px]"
-                  value={csmpIssue.description || ''}
+                  value={cspmIssue.description || ''}
                   onChange={(e) => updateCSPMIssue('description', e.target.value)}
                 />
               </div>
@@ -293,7 +293,7 @@ const IaCRemediationAgent = () => {
               <div className="flex justify-end pt-4">
                 <Button 
                   onClick={handleCSPMRemediation}
-                  disabled={!csmpIssue.id || !csmpIssue.location?.filePath || isProcessing}
+                  disabled={!cspmIssue.id || !cspmIssue.location?.filePath || isProcessing}
                   className="flex items-center gap-2"
                 >
                   {isProcessing ? (
