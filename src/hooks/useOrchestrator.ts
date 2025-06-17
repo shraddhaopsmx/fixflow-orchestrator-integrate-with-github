@@ -4,6 +4,7 @@ import { OpsMxIssue } from '@/types/opsmx';
 import { orchestrator } from '@/lib/orchestrator';
 import { issueStore } from '@/lib/issue-store';
 import { assignmentService } from '@/lib/assignment-service';
+import { approvalService } from '@/lib/approval-service';
 
 interface OrchestratorStats {
   isPolling: boolean;
@@ -32,6 +33,12 @@ interface OrchestratorStats {
     assignmentsByUser: Record<string, number>;
     auditLogEntries: number;
   };
+  approvalStats: {
+    waitingForApproval: number;
+    approved: number;
+    rejected: number;
+    totalProcessed: number;
+  };
 }
 
 export const useOrchestrator = () => {
@@ -51,6 +58,11 @@ export const useOrchestrator = () => {
       updateStats();
     });
 
+    // Subscribe to approval updates
+    const unsubscribeApprovals = approvalService.subscribe(() => {
+      updateStats();
+    });
+
     // Initial load
     setIssues(issueStore.getAllIssues());
     updateStats();
@@ -58,16 +70,19 @@ export const useOrchestrator = () => {
     return () => {
       unsubscribeIssues();
       unsubscribeAssignments();
+      unsubscribeApprovals();
     };
   }, []);
 
   const updateStats = useCallback(() => {
     const orchestratorStats = orchestrator.getStats();
     const assignmentStats = assignmentService.getStats();
+    const approvalStats = approvalService.getStats();
     
     setStats({
       ...orchestratorStats,
-      assignmentStats
+      assignmentStats,
+      approvalStats
     });
   }, []);
 
@@ -102,6 +117,7 @@ export const useOrchestrator = () => {
   const clearIssues = useCallback(() => {
     issueStore.clear();
     assignmentService.clear();
+    approvalService.clear();
   }, []);
 
   return {

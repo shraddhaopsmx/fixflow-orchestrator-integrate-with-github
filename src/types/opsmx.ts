@@ -1,4 +1,3 @@
-
 export interface OpsMxIssue {
   issueId: string;
   type: 'SAST' | 'SCA' | 'IaC' | 'CSPM' | 'PIPELINE' | 'RUNTIME';
@@ -16,6 +15,27 @@ export interface OpsMxIssue {
   assignedAt?: string;
   description: string;
   timestamp: string;
+  approvalData?: ApprovalData;
+}
+
+export interface ApprovalData {
+  approverId?: string;
+  approvedAt?: string;
+  rejectedAt?: string;
+  rejectionReason?: string;
+  approvalComment?: string;
+}
+
+export interface ApprovalRequest {
+  issueId: string;
+  approverId: string;
+  comment?: string;
+}
+
+export interface RejectionRequest {
+  issueId: string;
+  approverId: string;
+  reason: string;
 }
 
 export interface OpsMxApiResponse {
