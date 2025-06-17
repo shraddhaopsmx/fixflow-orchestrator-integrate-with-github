@@ -11,7 +11,9 @@ export interface OpsMxIssue {
     resourceId?: string;
     region?: string;
   };
-  status: 'open' | 'approved' | 'mitigated';
+  status: 'open' | 'assigned' | 'in_progress' | 'waiting_for_approval' | 'approved' | 'rejected' | 'resolved' | 'mitigated';
+  assignedTo?: string;
+  assignedAt?: string;
   description: string;
   timestamp: string;
 }
@@ -27,4 +29,27 @@ export interface OrchestratorConfig {
   pollInterval: number;
   backoffInterval: number;
   maxRetries: number;
+}
+
+export interface IssueAssignment {
+  issueId: string;
+  assigneeId: string;
+  assignedAt: string;
+  assignedBy: string;
+}
+
+export interface AssignmentRequest {
+  issueId: string;
+  assigneeId: string;
+  assignedBy?: string;
+}
+
+export interface AuditLogEntry {
+  timestamp: string;
+  issueId: string;
+  action: 'created' | 'assigned' | 'status_changed' | 'resolved';
+  actor: string;
+  fromStatus?: string;
+  toStatus?: string;
+  details: any;
 }

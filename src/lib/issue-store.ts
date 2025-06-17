@@ -42,11 +42,30 @@ class IssueStore {
     return this.getAllIssues().filter(issue => issue.status === 'open');
   }
 
+  getIssuesByStatus(status: OpsMxIssue['status']): OpsMxIssue[] {
+    return this.getAllIssues().filter(issue => issue.status === status);
+  }
+
+  getIssuesByAssignee(assigneeId: string): OpsMxIssue[] {
+    return this.getAllIssues().filter(issue => issue.assignedTo === assigneeId);
+  }
+
   updateIssueStatus(issueId: string, status: OpsMxIssue['status']): boolean {
     const issue = this.issues.get(issueId);
     if (issue) {
       issue.status = status;
       console.log(`[IssueStore] Updated issue ${issueId} status to ${status}`);
+      this.notifyListeners();
+      return true;
+    }
+    return false;
+  }
+
+  updateIssue(issueId: string, updates: Partial<OpsMxIssue>): boolean {
+    const issue = this.issues.get(issueId);
+    if (issue) {
+      Object.assign(issue, updates);
+      console.log(`[IssueStore] Updated issue ${issueId}:`, Object.keys(updates));
       this.notifyListeners();
       return true;
     }
@@ -87,7 +106,12 @@ class IssueStore {
     return {
       total: issues.length,
       open: issues.filter(i => i.status === 'open').length,
+      assigned: issues.filter(i => i.status === 'assigned').length,
+      in_progress: issues.filter(i => i.status === 'in_progress').length,
+      waiting_for_approval: issues.filter(i => i.status === 'waiting_for_approval').length,
       approved: issues.filter(i => i.status === 'approved').length,
+      rejected: issues.filter(i => i.status === 'rejected').length,
+      resolved: issues.filter(i => i.status === 'resolved').length,
       mitigated: issues.filter(i => i.status === 'mitigated').length,
       bySeverity: {
         critical: issues.filter(i => i.severity === 'Critical').length,
