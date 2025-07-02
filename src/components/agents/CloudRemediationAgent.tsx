@@ -1,14 +1,14 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { cloudTestCases } from '@/lib/cloud-test-data';
 import { cloudRemediationService } from '@/lib/cloud-remediation-service';
 import { CSPMFinding, RemediationPlan } from '@/types/cloud';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Terminal, Play, Edit, Check, X, Eye, Clock, AlertTriangle, CheckCircle } from "lucide-react";
+import { Terminal, Play, Edit, Check, X, Clock, AlertTriangle, CheckCircle, Bot, User, Send } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from '../ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -31,25 +31,54 @@ interface PlannerResponse {
   confidence: number;
 }
 
+interface ChatMessage {
+  id: string;
+  type: 'user' | 'ai';
+  content: string;
+  timestamp: Date;
+  isEditing?: boolean;
+}
+
 const CloudRemediationAgent = () => {
   const [selectedFindingId, setSelectedFindingId] = useState<string | null>(null);
   const [currentPhase, setCurrentPhase] = useState<'select' | 'planner' | 'executor'>('select');
   const [plannerResponse, setPlannerResponse] = useState<PlannerResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [editingStep, setEditingStep] = useState<number | null>(null);
   const [executionStatus, setExecutionStatus] = useState<'idle' | 'running' | 'completed' | 'failed'>('idle');
   const [currentExecutingStep, setCurrentExecutingStep] = useState<number | null>(null);
+  
+  // Chat-like interface state
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [userInput, setUserInput] = useState('');
+  const [editingPlan, setEditingPlan] = useState<string>('');
+  const [isEditingPlan, setIsEditingPlan] = useState(false);
 
   const selectedFinding = cloudTestCases.find(f => f.findingId === selectedFindingId);
+
+  const formatPlanAsText = (steps: RemediationStep[]): string => {
+    return steps.map(step => 
+      `Step ${step.step_no}: ${step.comment}\n${step.command ? `Command: ${step.command}` : 'Verification step'}\n`
+    ).join('\n');
+  };
 
   const handleGeneratePlan = async () => {
     if (!selectedFinding) return;
 
     setIsLoading(true);
     setCurrentPhase('planner');
+    setChatMessages([]);
     toast.info("AI is analyzing the issue and generating remediation plan...");
     
     try {
+      // Add user message
+      const userMessage: ChatMessage = {
+        id: Date.now().toString(),
+        type: 'user',
+        content: `Please generate a remediation plan for: ${selectedFinding.description}`,
+        timestamp: new Date()
+      };
+      setChatMessages([userMessage]);
+
       // Simulate AI planner response
       await new Promise(resolve => setTimeout(resolve, 2000));
       
@@ -98,6 +127,17 @@ const CloudRemediationAgent = () => {
       };
       
       setPlannerResponse(mockPlannerResponse);
+      
+      // Add AI response message
+      const aiMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        type: 'ai',
+        content: formatPlanAsText(mockPlannerResponse.steps),
+        timestamp: new Date()
+      };
+      setChatMessages(prev => [...prev, aiMessage]);
+      setEditingPlan(formatPlanAsText(mockPlannerResponse.steps));
+      
       toast.success("Remediation plan generated successfully!");
     } catch (e) {
       toast.error("Failed to generate remediation plan.");
@@ -105,6 +145,53 @@ const CloudRemediationAgent = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSendFeedback = () => {
+    if (!userInput.trim()) return;
+
+    const newMessage: ChatMessage = {
+      id: Date.now().toString(),
+      type: 'user',
+      content: userInput,
+      timestamp: new Date()
+    };
+
+    setChatMessages(prev => [...prev, newMessage]);
+    setUserInput('');
+
+    // Simulate AI response to feedback
+    setTimeout(() => {
+      const aiResponse: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        type: 'ai',
+        content: "I understand your feedback. Let me adjust the plan accordingly...",
+        timestamp: new Date()
+      };
+      setChatMessages(prev => [...prev, aiResponse]);
+    }, 1000);
+  };
+
+  const handleEditPlan = () => {
+    setIsEditingPlan(true);
+  };
+
+  const handleSavePlan = () => {
+    setIsEditingPlan(false);
+    // Update the chat message with edited content
+    setChatMessages(prev => 
+      prev.map(msg => 
+        msg.type === 'ai' && msg.content.includes('Step') 
+          ? { ...msg, content: editingPlan }
+          : msg
+      )
+    );
+    toast.success("Plan updated successfully!");
+  };
+
+  const handleApprovePlan = () => {
+    toast.success("Plan approved! Ready for execution.");
+    setCurrentPhase('executor');
   };
 
   const handleExecutePlan = async () => {
@@ -151,22 +238,16 @@ const CloudRemediationAgent = () => {
     }
   };
 
-  const handleEditStep = (stepIndex: number) => {
-    setEditingStep(stepIndex);
-  };
-
-  const handleApproveStep = (stepIndex: number) => {
-    toast.success(`Step ${stepIndex + 1} approved`);
-    setEditingStep(null);
-  };
-
   const resetWorkflow = () => {
     setCurrentPhase('select');
     setPlannerResponse(null);
     setExecutionStatus('idle');
     setCurrentExecutingStep(null);
-    setEditingStep(null);
     setSelectedFindingId(null);
+    setChatMessages([]);
+    setUserInput('');
+    setEditingPlan('');
+    setIsEditingPlan(false);
   };
 
   const getSeverityBadge = (severity: 'Critical' | 'High' | 'Medium' | 'Low') => {
@@ -274,97 +355,103 @@ const CloudRemediationAgent = () => {
                     </AlertDescription>
                   </Alert>
 
+                  {/* Chat-like Interface */}
                   <Card>
-                    <CardHeader className="flex flex-row items-center justify-between">
-                      <CardTitle>Remediation Plan</CardTitle>
+                    <CardHeader>
+                      <CardTitle>Remediation Plan Chat</CardTitle>
+                      <CardDescription>
+                        Review and edit the AI-generated plan, or provide feedback for adjustments
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {/* Chat Messages */}
+                      <div className="space-y-4 max-h-96 overflow-y-auto bg-gray-50 p-4 rounded-lg">
+                        {chatMessages.map((message) => (
+                          <div key={message.id} className={`flex gap-3 ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
+                            <div className={`flex gap-2 max-w-[80%] ${message.type === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${message.type === 'user' ? 'bg-blue-500' : 'bg-gray-700'}`}>
+                                {message.type === 'user' ? <User className="h-4 w-4 text-white" /> : <Bot className="h-4 w-4 text-white" />}
+                              </div>
+                              <div className={`p-3 rounded-lg ${message.type === 'user' ? 'bg-blue-500 text-white' : 'bg-white border'}`}>
+                                {message.type === 'ai' && message.content.includes('Step') ? (
+                                  <div className="space-y-3">
+                                    {isEditingPlan ? (
+                                      <div className="space-y-3">
+                                        <Textarea
+                                          value={editingPlan}
+                                          onChange={(e) => setEditingPlan(e.target.value)}
+                                          className="min-h-[200px] font-mono text-sm"
+                                          placeholder="Edit the remediation plan..."
+                                        />
+                                        <div className="flex gap-2">
+                                          <Button size="sm" onClick={handleSavePlan}>
+                                            <Check className="h-4 w-4 mr-1" />
+                                            Save Changes
+                                          </Button>
+                                          <Button size="sm" variant="outline" onClick={() => setIsEditingPlan(false)}>
+                                            <X className="h-4 w-4 mr-1" />
+                                            Cancel
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="space-y-3">
+                                        <pre className="whitespace-pre-wrap font-mono text-sm bg-gray-50 p-3 rounded border">
+                                          {message.content}
+                                        </pre>
+                                        <div className="flex gap-2">
+                                          <Button size="sm" onClick={handleEditPlan}>
+                                            <Edit className="h-4 w-4 mr-1" />
+                                            Edit Plan
+                                          </Button>
+                                          <Button size="sm" onClick={handleApprovePlan} className="bg-green-600 hover:bg-green-700">
+                                            <Check className="h-4 w-4 mr-1" />
+                                            Approve & Execute
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <p className="text-sm">{message.content}</p>
+                                )}
+                                <div className="text-xs opacity-70 mt-2">
+                                  {message.timestamp.toLocaleTimeString()}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Input for user feedback */}
                       <div className="flex gap-2">
+                        <Input
+                          value={userInput}
+                          onChange={(e) => setUserInput(e.target.value)}
+                          placeholder="Provide feedback or ask for plan modifications..."
+                          onKeyPress={(e) => e.key === 'Enter' && handleSendFeedback()}
+                          className="flex-1"
+                        />
+                        <Button onClick={handleSendFeedback} disabled={!userInput.trim()}>
+                          <Send className="h-4 w-4" />
+                        </Button>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex justify-between pt-4 border-t">
+                        <Button variant="outline" onClick={resetWorkflow}>
+                          <X className="h-4 w-4 mr-1" />
+                          Cancel
+                        </Button>
                         <Button 
                           onClick={handleExecutePlan}
-                          disabled={executionStatus === 'running'}
+                          disabled={executionStatus === 'running' || isEditingPlan}
                           className="flex items-center gap-2"
                         >
                           <Play className="h-4 w-4" />
                           Execute Plan
                         </Button>
-                        <Button variant="outline" onClick={resetWorkflow}>
-                          <X className="h-4 w-4" />
-                          Cancel
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        {plannerResponse.steps.map((step, index) => (
-                          <div key={step.step_no} className="border rounded-lg p-4 space-y-3">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-3">
-                                {getStepStatusIcon(step.status)}
-                                <div>
-                                  <h4 className="font-medium">Step {step.step_no}</h4>
-                                  <Badge variant="outline" className="text-xs">
-                                    {step.command_type.replace(/-/g, ' ')}
-                                  </Badge>
-                                </div>
-                              </div>
-                              
-                              <div className="flex gap-2">
-                                <Dialog>
-                                  <DialogTrigger asChild>
-                                    <Button size="sm" variant="outline">
-                                      <Eye className="h-4 w-4" />
-                                    </Button>
-                                  </DialogTrigger>
-                                  <DialogContent className="max-w-600">
-                                    <DialogHeader>
-                                      <DialogTitle>Step {step.step_no} Details</DialogTitle>
-                                      <DialogDescription>
-                                        Review and modify the step details
-                                      </DialogDescription>
-                                    </DialogHeader>
-                                    <div className="space-y-4">
-                                      <div>
-                                        <label className="text-sm font-medium">Comment:</label>
-                                        <p className="text-sm text-muted-foreground">{step.comment}</p>
-                                      </div>
-                                      {step.command && (
-                                        <div>
-                                          <label className="text-sm font-medium">Command:</label>
-                                          <pre className="bg-gray-900 text-white p-3 rounded text-sm mt-1">
-                                            {step.command}
-                                          </pre>
-                                        </div>
-                                      )}
-                                      <div className="flex gap-2">
-                                        <Button size="sm" onClick={() => handleApproveStep(index)}>
-                                          <Check className="h-4 w-4 mr-1" />
-                                          Approve
-                                        </Button>
-                                        <Button size="sm" variant="outline" onClick={() => handleEditStep(index)}>
-                                          <Edit className="h-4 w-4 mr-1" />
-                                          Edit
-                                        </Button>
-                                      </div>
-                                    </div>
-                                  </DialogContent>
-                                </Dialog>
-                              </div>
-                            </div>
-                            
-                            <p className="text-sm text-muted-foreground">{step.comment}</p>
-                            
-                            {step.command && (
-                              <pre className="bg-gray-900 text-white p-3 rounded text-sm overflow-x-auto">
-                                {step.command}
-                              </pre>
-                            )}
-                            
-                            {step.status === 'completed' && step.output && (
-                              <div className="bg-green-50 border border-green-200 p-3 rounded">
-                                <p className="text-sm text-green-800">{step.output}</p>
-                              </div>
-                            )}
-                          </div>
-                        ))}
                       </div>
                     </CardContent>
                   </Card>
