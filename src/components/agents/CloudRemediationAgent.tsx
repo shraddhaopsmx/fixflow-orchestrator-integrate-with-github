@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -52,12 +53,13 @@ const CloudRemediationAgent = () => {
   const [userInput, setUserInput] = useState('');
   const [editingPlan, setEditingPlan] = useState<string>('');
   const [isEditingPlan, setIsEditingPlan] = useState(false);
+  const [isPlanApproved, setIsPlanApproved] = useState(false);
 
   const selectedFinding = cloudTestCases.find(f => f.findingId === selectedFindingId);
 
   const formatPlanAsText = (steps: RemediationStep[]): string => {
     return steps.map(step => 
-      `Step ${step.step_no}: ${step.comment}\n${step.command ? `Command: ${step.command}` : 'Verification step'}\n`
+      `**Step ${step.step_no}:** ${step.comment}\n${step.command ? `Command: \`${step.command}\`` : 'Verification step'}\n`
     ).join('\n');
   };
 
@@ -67,6 +69,7 @@ const CloudRemediationAgent = () => {
     setIsLoading(true);
     setCurrentPhase('planner');
     setChatMessages([]);
+    setIsPlanApproved(false);
     toast.info("AI is analyzing the issue and generating remediation plan...");
     
     try {
@@ -178,6 +181,7 @@ const CloudRemediationAgent = () => {
 
   const handleSavePlan = () => {
     setIsEditingPlan(false);
+    setIsPlanApproved(true);
     // Update the chat message with edited content
     setChatMessages(prev => 
       prev.map(msg => 
@@ -186,12 +190,15 @@ const CloudRemediationAgent = () => {
           : msg
       )
     );
-    toast.success("Plan updated successfully!");
+    toast.success("Plan updated and approved!");
   };
 
   const handleApprovePlan = () => {
-    toast.success("Plan approved! Ready for execution.");
-    setCurrentPhase('executor');
+    setIsPlanApproved(true);
+    toast.success("Plan approved! Proceeding to execution...");
+    setTimeout(() => {
+      setCurrentPhase('executor');
+    }, 1000);
   };
 
   const handleExecutePlan = async () => {
@@ -248,6 +255,7 @@ const CloudRemediationAgent = () => {
     setUserInput('');
     setEditingPlan('');
     setIsEditingPlan(false);
+    setIsPlanApproved(false);
   };
 
   const getSeverityBadge = (severity: 'Critical' | 'High' | 'Medium' | 'Low') => {
@@ -344,117 +352,157 @@ const CloudRemediationAgent = () => {
               )}
             </TabsContent>
 
-            <TabsContent value="planner" className="space-y-4">
+            <TabsContent value="planner" className="space-y-6">
               {plannerResponse && (
                 <>
-                  <Alert>
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertTitle>AI Planner Results</AlertTitle>
-                    <AlertDescription>
+                  <Alert className="border-blue-200 bg-blue-50">
+                    <AlertTriangle className="h-4 w-4 text-blue-600" />
+                    <AlertTitle className="text-blue-800">AI Analysis Complete</AlertTitle>
+                    <AlertDescription className="text-blue-700">
                       {plannerResponse.summary} (Confidence: {plannerResponse.confidence}%)
                     </AlertDescription>
                   </Alert>
 
-                  {/* Chat-like Interface */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Remediation Plan Chat</CardTitle>
-                      <CardDescription>
-                        Review and edit the AI-generated plan, or provide feedback for adjustments
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      {/* Chat Messages */}
-                      <div className="space-y-4 max-h-96 overflow-y-auto bg-gray-50 p-4 rounded-lg">
-                        {chatMessages.map((message) => (
-                          <div key={message.id} className={`flex gap-3 ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
-                            <div className={`flex gap-2 max-w-[80%] ${message.type === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-                              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${message.type === 'user' ? 'bg-blue-500' : 'bg-gray-700'}`}>
-                                {message.type === 'user' ? <User className="h-4 w-4 text-white" /> : <Bot className="h-4 w-4 text-white" />}
-                              </div>
-                              <div className={`p-3 rounded-lg ${message.type === 'user' ? 'bg-blue-500 text-white' : 'bg-white border'}`}>
-                                {message.type === 'ai' && message.content.includes('Step') ? (
-                                  <div className="space-y-3">
-                                    {isEditingPlan ? (
-                                      <div className="space-y-3">
-                                        <Textarea
-                                          value={editingPlan}
-                                          onChange={(e) => setEditingPlan(e.target.value)}
-                                          className="min-h-[200px] font-mono text-sm"
-                                          placeholder="Edit the remediation plan..."
-                                        />
-                                        <div className="flex gap-2">
-                                          <Button size="sm" onClick={handleSavePlan}>
-                                            <Check className="h-4 w-4 mr-1" />
-                                            Save Changes
-                                          </Button>
-                                          <Button size="sm" variant="outline" onClick={() => setIsEditingPlan(false)}>
-                                            <X className="h-4 w-4 mr-1" />
-                                            Cancel
-                                          </Button>
-                                        </div>
+                  {/* Modern Chat Interface */}
+                  <div className="bg-gradient-to-b from-gray-50 to-white rounded-xl border border-gray-200 shadow-sm">
+                    {/* Chat Messages */}
+                    <div className="p-6 space-y-6 max-h-96 overflow-y-auto">
+                      {chatMessages.map((message) => (
+                        <div key={message.id} className={`flex gap-4 ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
+                          <div className={`flex gap-3 max-w-[85%] ${message.type === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                            {/* Avatar */}
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center shadow-sm ${
+                              message.type === 'user' 
+                                ? 'bg-blue-500' 
+                                : 'bg-gradient-to-br from-purple-500 to-blue-600'
+                            }`}>
+                              {message.type === 'user' ? 
+                                <User className="h-4 w-4 text-white" /> : 
+                                <Bot className="h-4 w-4 text-white" />
+                              }
+                            </div>
+                            
+                            {/* Message Bubble */}
+                            <div className={`rounded-2xl px-4 py-3 shadow-sm ${
+                              message.type === 'user' 
+                                ? 'bg-blue-500 text-white' 
+                                : 'bg-white border border-gray-200'
+                            }`}>
+                              {message.type === 'ai' && message.content.includes('Step') ? (
+                                <div className="space-y-4">
+                                  {isEditingPlan ? (
+                                    <div className="space-y-3">
+                                      <Textarea
+                                        value={editingPlan}
+                                        onChange={(e) => setEditingPlan(e.target.value)}
+                                        className="min-h-[200px] font-mono text-sm border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                                        placeholder="Edit the remediation plan..."
+                                      />
+                                      <div className="flex gap-2">
+                                        <Button size="sm" onClick={handleSavePlan} className="bg-green-600 hover:bg-green-700">
+                                          <Check className="h-4 w-4 mr-1" />
+                                          Save & Approve
+                                        </Button>
+                                        <Button size="sm" variant="outline" onClick={() => setIsEditingPlan(false)}>
+                                          <X className="h-4 w-4 mr-1" />
+                                          Cancel
+                                        </Button>
                                       </div>
-                                    ) : (
-                                      <div className="space-y-3">
-                                        <pre className="whitespace-pre-wrap font-mono text-sm bg-gray-50 p-3 rounded border">
+                                    </div>
+                                  ) : (
+                                    <div className="space-y-4">
+                                      <div className="prose prose-sm max-w-none">
+                                        <div className="bg-gray-50 p-4 rounded-lg border font-mono text-sm whitespace-pre-wrap">
                                           {message.content}
-                                        </pre>
-                                        <div className="flex gap-2">
-                                          <Button size="sm" onClick={handleEditPlan}>
-                                            <Edit className="h-4 w-4 mr-1" />
-                                            Edit Plan
-                                          </Button>
-                                          <Button size="sm" onClick={handleApprovePlan} className="bg-green-600 hover:bg-green-700">
-                                            <Check className="h-4 w-4 mr-1" />
-                                            Approve & Execute
-                                          </Button>
                                         </div>
                                       </div>
-                                    )}
-                                  </div>
-                                ) : (
-                                  <p className="text-sm">{message.content}</p>
-                                )}
-                                <div className="text-xs opacity-70 mt-2">
-                                  {message.timestamp.toLocaleTimeString()}
+                                      
+                                      {/* Action Buttons */}
+                                      {!isPlanApproved && (
+                                        <div className="flex gap-2 pt-2">
+                                          <Button 
+                                            size="sm" 
+                                            onClick={handleApprovePlan}
+                                            className="bg-green-600 hover:bg-green-700 text-white"
+                                          >
+                                            <Check className="h-4 w-4 mr-1" />
+                                            Approve
+                                          </Button>
+                                          <Button 
+                                            size="sm" 
+                                            variant="outline" 
+                                            onClick={handleEditPlan}
+                                            className="border-gray-300 hover:bg-gray-50"
+                                          >
+                                            <Edit className="h-4 w-4 mr-1" />
+                                            Edit
+                                          </Button>
+                                        </div>
+                                      )}
+                                      
+                                      {isPlanApproved && (
+                                        <div className="flex items-center gap-2 pt-2">
+                                          <CheckCircle className="h-4 w-4 text-green-500" />
+                                          <span className="text-sm text-green-600 font-medium">Plan Approved</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
+                              ) : (
+                                <p className="text-sm leading-relaxed">{message.content}</p>
+                              )}
+                              
+                              <div className={`text-xs mt-2 ${
+                                message.type === 'user' ? 'text-blue-100' : 'text-gray-500'
+                              }`}>
+                                {message.timestamp.toLocaleTimeString()}
                               </div>
                             </div>
                           </div>
-                        ))}
-                      </div>
+                        </div>
+                      ))}
+                    </div>
 
-                      {/* Input for user feedback */}
-                      <div className="flex gap-2">
-                        <Input
-                          value={userInput}
-                          onChange={(e) => setUserInput(e.target.value)}
-                          placeholder="Provide feedback or ask for plan modifications..."
-                          onKeyPress={(e) => e.key === 'Enter' && handleSendFeedback()}
-                          className="flex-1"
-                        />
-                        <Button onClick={handleSendFeedback} disabled={!userInput.trim()}>
+                    {/* User Input Area */}
+                    <div className="border-t border-gray-200 p-4 bg-white rounded-b-xl">
+                      <div className="flex gap-3 items-end">
+                        <div className="flex-1">
+                          <Input
+                            value={userInput}
+                            onChange={(e) => setUserInput(e.target.value)}
+                            placeholder="Ask questions or provide feedback about the plan..."
+                            onKeyPress={(e) => e.key === 'Enter' && handleSendFeedback()}
+                            className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                          />
+                        </div>
+                        <Button 
+                          onClick={handleSendFeedback} 
+                          disabled={!userInput.trim()}
+                          size="sm"
+                          className="bg-blue-500 hover:bg-blue-600"
+                        >
                           <Send className="h-4 w-4" />
                         </Button>
                       </div>
+                    </div>
+                  </div>
 
-                      {/* Action Buttons */}
-                      <div className="flex justify-between pt-4 border-t">
-                        <Button variant="outline" onClick={resetWorkflow}>
-                          <X className="h-4 w-4 mr-1" />
-                          Cancel
-                        </Button>
-                        <Button 
-                          onClick={handleExecutePlan}
-                          disabled={executionStatus === 'running' || isEditingPlan}
-                          className="flex items-center gap-2"
-                        >
-                          <Play className="h-4 w-4" />
-                          Execute Plan
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  {/* Bottom Actions */}
+                  <div className="flex justify-between items-center pt-4 border-t">
+                    <Button variant="outline" onClick={resetWorkflow} className="border-gray-300">
+                      <X className="h-4 w-4 mr-1" />
+                      Cancel
+                    </Button>
+                    <Button 
+                      onClick={handleExecutePlan}
+                      disabled={!isPlanApproved || executionStatus === 'running' || isEditingPlan}
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      <Play className="h-4 w-4 mr-1" />
+                      Execute Plan
+                    </Button>
+                  </div>
                 </>
               )}
             </TabsContent>
