@@ -9,6 +9,7 @@ import PipelineRemediationAgent from "@/components/agents/PipelineRemediationAge
 import RuntimeRemediationAgent from "@/components/agents/RuntimeRemediationAgent";
 import CloudRemediationAgent from "@/components/agents/CloudRemediationAgent";
 import CodeRemediationAgent from "@/components/agents/CodeRemediationAgent";
+import CVERemediationAgent from "@/components/agents/CVERemediationAgent";
 import { Agent } from "@/types";
 
 const Agents = () => {
@@ -47,13 +48,14 @@ const Agents = () => {
       </div>
 
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="grid w-full grid-cols-8">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="code-agent">Code Agent</TabsTrigger>
           <TabsTrigger value="iac-agent">IaC Agent</TabsTrigger>
           <TabsTrigger value="pipeline-agent">Pipeline Agent</TabsTrigger>
           <TabsTrigger value="runtime-agent">Runtime Agent</TabsTrigger>
           <TabsTrigger value="cloud-agent">Cloud Agent</TabsTrigger>
+          <TabsTrigger value="cve-agent">CVE Agent</TabsTrigger>
           <TabsTrigger value="performance">Performance</TabsTrigger>
         </TabsList>
         
@@ -123,6 +125,10 @@ const Agents = () => {
 
         <TabsContent value="cloud-agent">
           <CloudRemediationAgent />
+        </TabsContent>
+
+        <TabsContent value="cve-agent">
+          <CVERemediationAgent />
         </TabsContent>
         
         <TabsContent value="performance" className="space-y-4">
